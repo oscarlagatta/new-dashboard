@@ -27,7 +27,7 @@ import {
   TechnologyCellRenderer,
   DispositionCellRenderer,
 } from "@/components/ag-grid/cell-renderers";
-import { VulnerabilityDetailSheet } from "@/components/vulnerability/detail-sheet";
+import { DetailSheet } from "@/components/vulnerability/detail-sheet";
 import type { Vulnerability } from "@/lib/types";
 
 // Import AG Grid setup (registers enterprise modules and license)
@@ -339,7 +339,7 @@ export function AgGridVulnerabilityTable() {
 
       {/* Detail Sheet */}
       {selectedVulnerability && (
-        <VulnerabilityDetailSheet
+        <DetailSheet
           vulnerability={selectedVulnerability}
           open={sheetOpen}
           onOpenChange={setSheetOpen}
