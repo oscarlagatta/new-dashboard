@@ -1,680 +1,851 @@
-"use client"
+"use client";
 
-import { useState, useMemo } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
+/**
+ * Vulnerability Triage Dashboard
+ * AG Grid Enterprise v32.3.0 + AG Charts Enterprise v10.0.0
+ * 
+ * API MIGRATION COMMENT:
+ * For production, replace inline mock data with Server-Side Row Model.
+ * Set rowModelType='serverSide' and provide a serverSideDatasource that calls the .NET API.
+ * Filter, sort, and group state can be passed to the backend via the request object.
+ * Pagination will be handled server-side.
+ */
+
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type {
+  ColDef,
+  GridReadyEvent,
+  RowClickedEvent,
+  SelectionChangedEvent,
+  GridApi,
+  GetContextMenuItemsParams,
+  MenuItemDef,
+  StatusPanelDef,
+} from "ag-grid-community";
+import { themeQuartz } from "ag-grid-community";
+import "@/lib/ag-grid-setup";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuCheckboxItem,
+  DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
-import { FilterPopover } from "@/components/vulnerability/filter-popover"
-import { VulnerabilityTable } from "@/components/vulnerability/vulnerability-table"
-import { DetailSheet } from "@/components/vulnerability/detail-sheet"
-import { mockVulnerabilities, defaultColumnVisibility } from "@/lib/mock-data"
-import type {
-  Vulnerability,
-  VulnerabilityStatus,
-  Severity,
-  Disposition,
-  SortField,
-  SortDirection,
-  ColumnVisibility,
-  ViewDensity,
-} from "@/lib/types"
+} from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Search,
-  X,
-  ChevronLeft,
-  ChevronRight,
-  Columns3,
-  Users,
-  FileText,
   Download,
-} from "lucide-react"
+  ChevronDown,
+  X,
+  Users,
+  FileSpreadsheet,
+  RefreshCw,
+} from "lucide-react";
 
-const STATUS_OPTIONS: VulnerabilityStatus[] = [
-  "Awaiting Disposition",
-  "In Progress",
-  "Pending Clear Scan",
-  "Resolved",
-]
+import {
+  StatusBadgeCellRenderer,
+  SeverityBadgeCellRenderer,
+  OperatingEnvironmentBadgeCellRenderer,
+  CVELinkCellRenderer,
+  CRQLinkCellRenderer,
+  DueDateCellRenderer,
+  DaysOpenCellRenderer,
+  OwnerCellRenderer,
+  TechnologyCellRenderer,
+  DispositionCellRenderer,
+  VerificationStatusCellRenderer,
+  BooleanBadgeCellRenderer,
+  SourceBadgeCellRenderer,
+  LastUpdatedCellRenderer,
+} from "@/components/ag-grid/cell-renderers";
+import { StatCards } from "@/components/vulnerability/stat-cards";
+import { SeverityStatusChart } from "@/components/vulnerability/severity-status-chart";
+import { DetailSheet } from "@/components/vulnerability/detail-sheet";
+import {
+  mockVulnerabilities,
+  generateSeverityStatusData,
+  CIO_TEAMS,
+  USERS,
+} from "@/lib/mock-data";
+import { severityComparator, statusComparator } from "@/lib/ag-grid-setup";
+import type { Vulnerability, Disposition } from "@/lib/types";
 
-const SEVERITY_OPTIONS: Severity[] = ["Critical", "High", "Medium", "Low"]
-
-const DISPOSITION_OPTIONS: Disposition[] = [
-  "Fix",
-  "Defer",
-  "Mitigate",
-  "Accept Risk",
-  "False Positive",
-]
-
-const ITEMS_PER_PAGE = 50
-
-const COLUMN_LABELS: Record<keyof ColumnVisibility, string> = {
-  status: "Status",
-  severity: "Severity",
-  cveId: "CVE",
-  title: "Title",
-  applicationFullName: "Application",
-  hostName: "Host / Server",
-  daysOpen: "Days Open",
-  dueDate: "Due Date",
-  disposition: "Disposition",
-  crqNumber: "CRQ #",
-  remediationCoordinator: "Coordinator",
-}
-
-export default function VulnerabilityTriageDashboard() {
-  const [vulnerabilities, setVulnerabilities] =
-    useState<Vulnerability[]>(mockVulnerabilities)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [severityFilter, setSeverityFilter] = useState<string[]>([])
-  const [dispositionFilter, setDispositionFilter] = useState<string[]>([])
-  const [applicationFilter, setApplicationFilter] = useState<string[]>([])
-  const [coordinatorFilter, setCoordinatorFilter] = useState<string[]>([])
-  const [selectedVulnerability, setSelectedVulnerability] =
-    useState<Vulnerability | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sortField, setSortField] = useState<SortField | null>(null)
-  const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [viewDensity, setViewDensity] = useState<ViewDensity>("comfortable")
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(defaultColumnVisibility)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-
-  // Get unique applications and coordinators for filters
-  const applicationOptions = useMemo(() => {
-    const apps = vulnerabilities.map((v) => v.applicationFullName)
-    return [...new Set(apps)].sort()
-  }, [vulnerabilities])
-
-  const coordinatorOptions = useMemo(() => {
-    const coords = vulnerabilities
-      .map((v) => v.remediationCoordinator?.name)
-      .filter((name): name is string => !!name)
-    return [...new Set(coords)].sort()
-  }, [vulnerabilities])
+export default function VulnerabilityDashboard() {
+  const gridRef = useRef<AgGridReact>(null);
+  const [gridApi, setGridApi] = useState<GridApi | null>(null);
+  const [rowData, setRowData] = useState<Vulnerability[]>(mockVulnerabilities);
+  const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedRows, setSelectedRows] = useState<Vulnerability[]>([]);
+  const [quickFilterText, setQuickFilterText] = useState("");
+  const [activeFilters, setActiveFilters] = useState<Record<string, string[]>>({});
+  const [selectedCio, setSelectedCio] = useState(CIO_TEAMS[0]);
 
   // Calculate stats
   const stats = useMemo(() => {
-    const awaiting = vulnerabilities.filter(
-      (v) => v.status === "Awaiting Disposition"
-    ).length
-    const inProgress = vulnerabilities.filter(
-      (v) => v.status === "In Progress"
-    ).length
-    const pendingScan = vulnerabilities.filter(
-      (v) => v.status === "Pending Clear Scan"
-    ).length
-    const resolved = vulnerabilities.filter(
-      (v) =>
-        v.status === "Resolved" &&
-        v.remediatedDate &&
-        v.remediatedDate >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    ).length
-    return { awaiting, inProgress, pendingScan, resolved }
-  }, [vulnerabilities])
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    return {
+      awaitingDisposition: rowData.filter((v) => v.status === "Awaiting Disposition").length,
+      inProgress: rowData.filter((v) => v.status === "In Progress").length,
+      pendingClearScan: rowData.filter((v) => v.status === "Pending Clear Scan").length,
+      resolvedLast30Days: rowData.filter(
+        (v) => v.status === "Resolved" && v.remediatedDate && new Date(v.remediatedDate) >= thirtyDaysAgo
+      ).length,
+    };
+  }, [rowData]);
 
-  // Filter and sort vulnerabilities
-  const filteredVulnerabilities = useMemo(() => {
-    let result = [...vulnerabilities]
+  const chartData = useMemo(() => generateSeverityStatusData(rowData), [rowData]);
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(
-        (v) =>
-          v.cveId.toLowerCase().includes(query) ||
-          v.hostName.toLowerCase().includes(query) ||
-          v.applicationFullName.toLowerCase().includes(query) ||
-          v.title.toLowerCase().includes(query)
-      )
+  // AG Grid theme customization matching shadcn
+  const theme = useMemo(() => {
+    return themeQuartz.withParams({
+      accentColor: "#3b82f6",
+      borderRadius: 6,
+      browserColorScheme: "light",
+      fontFamily: "inherit",
+      fontSize: 13,
+      headerFontSize: 13,
+      headerFontWeight: 600,
+      rowBorder: true,
+      spacing: 6,
+      wrapperBorder: true,
+      wrapperBorderRadius: 8,
+    });
+  }, []);
+
+  // Column definitions
+  const columnDefs = useMemo<ColDef[]>(
+    () => [
+      {
+        headerName: "",
+        field: "id",
+        width: 50,
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
+        pinned: "left",
+        lockPosition: true,
+        suppressHeaderMenuButton: true,
+        sortable: false,
+        filter: false,
+      },
+      {
+        headerName: "Status",
+        field: "status",
+        width: 170,
+        pinned: "left",
+        cellRenderer: StatusBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+        filterParams: {
+          values: ["Awaiting Disposition", "In Progress", "Pending Clear Scan", "Resolved"],
+        },
+        comparator: statusComparator,
+      },
+      {
+        headerName: "Severity",
+        field: "severity",
+        width: 100,
+        cellRenderer: SeverityBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+        filterParams: {
+          values: ["Critical", "High", "Medium", "Low"],
+        },
+        comparator: severityComparator,
+      },
+      {
+        headerName: "CVE",
+        field: "cve",
+        width: 160,
+        cellRenderer: CVELinkCellRenderer,
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Title",
+        field: "title",
+        flex: 1,
+        minWidth: 250,
+        tooltipField: "title",
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Technology",
+        field: "technology",
+        width: 180,
+        cellRenderer: TechnologyCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Host Name / Server",
+        field: "hostName",
+        width: 220,
+        cellClass: "font-mono text-xs",
+        tooltipField: "hostName",
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Operating Env",
+        field: "operatingEnvironment",
+        width: 140,
+        cellRenderer: OperatingEnvironmentBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+        filterParams: {
+          values: ["Production", "Non-Production", "Development", "UAT"],
+        },
+      },
+      {
+        headerName: "Days Open",
+        field: "daysOpen",
+        width: 110,
+        type: "numericColumn",
+        cellRenderer: DaysOpenCellRenderer,
+        filter: "agNumberColumnFilter",
+      },
+      {
+        headerName: "Due Date",
+        field: "dueDate",
+        width: 140,
+        cellRenderer: DueDateCellRenderer,
+        filter: "agDateColumnFilter",
+      },
+      {
+        headerName: "Disposition",
+        field: "disposition",
+        width: 130,
+        cellRenderer: DispositionCellRenderer,
+        filter: "agSetColumnFilter",
+        filterParams: {
+          values: ["Fix", "Defer", "Mitigate", "Accept Risk", "False Positive"],
+        },
+      },
+      {
+        headerName: "CRQ #",
+        field: "crqNumber",
+        width: 160,
+        cellRenderer: CRQLinkCellRenderer,
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Vuln Owner",
+        field: "vulnOwner",
+        width: 180,
+        cellRenderer: OwnerCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      // Hidden columns (togglable via Columns panel)
+      {
+        headerName: "Application",
+        field: "applicationFullName",
+        width: 200,
+        hide: true,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Verification Status",
+        field: "verificationStatus",
+        width: 160,
+        hide: true,
+        cellRenderer: VerificationStatusCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Source",
+        field: "source",
+        width: 100,
+        hide: true,
+        cellRenderer: SourceBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Past Due",
+        field: "pastDue",
+        width: 100,
+        hide: true,
+        cellRenderer: BooleanBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Scheduled Fix",
+        field: "scheduledFixDate",
+        width: 140,
+        hide: true,
+        filter: "agDateColumnFilter",
+        valueFormatter: (params) =>
+          params.value ? new Date(params.value).toLocaleDateString() : "—",
+      },
+      {
+        headerName: "Last Updated",
+        field: "lastUpdated",
+        width: 140,
+        hide: true,
+        cellRenderer: LastUpdatedCellRenderer,
+        filter: "agDateColumnFilter",
+      },
+      {
+        headerName: "GIS ID",
+        field: "gisId",
+        width: 160,
+        hide: true,
+        cellClass: "font-mono text-xs",
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Qualys ID",
+        field: "qualysId",
+        width: 120,
+        hide: true,
+        cellClass: "font-mono text-xs",
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "OS Name",
+        field: "osName",
+        width: 200,
+        hide: true,
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "IP Addresses",
+        field: "ipAddresses",
+        width: 180,
+        hide: true,
+        cellClass: "font-mono text-xs",
+        valueFormatter: (params) => params.value?.join(", ") || "—",
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Tier",
+        field: "tier",
+        width: 140,
+        hide: true,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Runbook Owner",
+        field: "runbookOwner",
+        width: 160,
+        hide: true,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Tech Executive",
+        field: "techExecutive",
+        width: 160,
+        hide: true,
+        filter: "agTextColumnFilter",
+      },
+      {
+        headerName: "Workstream",
+        field: "workstream",
+        width: 180,
+        hide: true,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Built In House",
+        field: "isBuiltInHouse",
+        width: 120,
+        hide: true,
+        cellRenderer: BooleanBadgeCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      {
+        headerName: "Hosting Platform",
+        field: "hostingPlatform",
+        width: 140,
+        hide: true,
+        filter: "agSetColumnFilter",
+      },
+    ],
+    []
+  );
+
+  // Default column properties
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      sortable: true,
+      filter: true,
+      floatingFilter: true,
+      resizable: true,
+      suppressHeaderMenuButton: false,
+    }),
+    []
+  );
+
+  // Status bar
+  const statusBar = useMemo<{ statusPanels: StatusPanelDef[] }>(
+    () => ({
+      statusPanels: [
+        { statusPanel: "agTotalRowCountComponent", align: "left" },
+        { statusPanel: "agFilteredRowCountComponent", align: "left" },
+        { statusPanel: "agSelectedRowCountComponent", align: "center" },
+        { statusPanel: "agAggregationComponent", align: "right" },
+      ],
+    }),
+    []
+  );
+
+  // Context menu
+  const getContextMenuItems = useCallback(
+    (params: GetContextMenuItemsParams): (string | MenuItemDef)[] => {
+      const result: (string | MenuItemDef)[] = [];
+      
+      if (params.column?.getColId() === "cve" && params.value) {
+        result.push({
+          name: "Open in NVD",
+          action: () => {
+            window.open(`https://nvd.nist.gov/vuln/detail/${params.value}`, "_blank");
+          },
+        });
+      }
+
+      if (params.column?.getColId() === "crqNumber" && params.value) {
+        result.push({
+          name: "Open in Remedy",
+          action: () => {
+            window.open(`https://remedy.bank.internal/arsys/forms/remedy/${params.value}`, "_blank");
+          },
+        });
+      }
+
+      if (params.value && params.column) {
+        result.push({
+          name: "Filter by this value",
+          action: () => {
+            const filterInstance = params.api.getFilterInstance(params.column!.getColId());
+            if (filterInstance) {
+              filterInstance.setModel({ values: [params.value] });
+              params.api.onFilterChanged();
+            }
+          },
+        });
+      }
+
+      result.push("separator");
+      result.push("copy");
+      result.push("copyWithHeaders");
+      result.push("separator");
+
+      if (params.node?.data) {
+        result.push({
+          name: "Assign to me",
+          action: () => {
+            const updatedData = { ...params.node!.data, vulnOwner: "Current User" };
+            params.node!.setData(updatedData);
+          },
+        });
+        result.push({
+          name: "Set Disposition",
+          subMenu: [
+            { name: "Fix", action: () => updateDisposition(params, "Fix") },
+            { name: "Defer", action: () => updateDisposition(params, "Defer") },
+            { name: "Mitigate", action: () => updateDisposition(params, "Mitigate") },
+            { name: "Accept Risk", action: () => updateDisposition(params, "Accept Risk") },
+            { name: "False Positive", action: () => updateDisposition(params, "False Positive") },
+          ],
+        });
+      }
+
+      result.push("separator");
+      result.push("export");
+      result.push("chartRange");
+
+      return result;
+    },
+    []
+  );
+
+  const updateDisposition = (params: GetContextMenuItemsParams, disposition: Disposition) => {
+    if (params.node?.data) {
+      const updatedData = { ...params.node.data, disposition };
+      params.node.setData(updatedData);
     }
+  };
 
-    // Status filter
-    if (statusFilter.length > 0) {
-      result = result.filter((v) => statusFilter.includes(v.status))
+  // Event handlers
+  const onGridReady = useCallback((params: GridReadyEvent) => {
+    setGridApi(params.api);
+  }, []);
+
+  const onRowClicked = useCallback((event: RowClickedEvent) => {
+    const target = event.event?.target as HTMLElement;
+    if (
+      target?.closest("button") ||
+      target?.closest("a") ||
+      target?.closest('[role="checkbox"]') ||
+      target?.closest(".ag-checkbox-input-wrapper")
+    ) {
+      return;
     }
+    setSelectedVuln(event.data);
+    setSheetOpen(true);
+  }, []);
 
-    // Severity filter
-    if (severityFilter.length > 0) {
-      result = result.filter((v) => severityFilter.includes(v.severity))
-    }
+  const onSelectionChanged = useCallback((event: SelectionChangedEvent) => {
+    setSelectedRows(event.api.getSelectedRows());
+  }, []);
 
-    // Disposition filter
-    if (dispositionFilter.length > 0) {
-      result = result.filter(
-        (v) => v.disposition && dispositionFilter.includes(v.disposition)
-      )
-    }
+  const handleQuickFilter = useCallback(
+    (value: string) => {
+      setQuickFilterText(value);
+      gridApi?.setGridOption("quickFilterText", value);
+    },
+    [gridApi]
+  );
 
-    // Application filter
-    if (applicationFilter.length > 0) {
-      result = result.filter((v) =>
-        applicationFilter.includes(v.applicationFullName)
-      )
-    }
+  // Export handlers
+  const handleExportExcel = useCallback(() => {
+    const selectedCount = selectedRows.length;
+    gridApi?.exportDataAsExcel({
+      fileName: `vulnerabilities_${selectedCio.code}_${new Date().toISOString().split("T")[0]}.xlsx`,
+      sheetName: "Vulnerabilities",
+      onlySelected: selectedCount > 0,
+    });
+  }, [gridApi, selectedRows.length, selectedCio.code]);
 
-    // Coordinator filter
-    if (coordinatorFilter.length > 0) {
-      result = result.filter(
-        (v) =>
-          v.remediationCoordinator &&
-          coordinatorFilter.includes(v.remediationCoordinator.name)
-      )
-    }
+  const handleExportCsv = useCallback(() => {
+    const selectedCount = selectedRows.length;
+    gridApi?.exportDataAsCsv({
+      fileName: `vulnerabilities_${selectedCio.code}_${new Date().toISOString().split("T")[0]}.csv`,
+      onlySelected: selectedCount > 0,
+    });
+  }, [gridApi, selectedRows.length, selectedCio.code]);
 
-    // Sorting
-    if (sortField) {
-      result.sort((a, b) => {
-        let aVal: string | number | Date | undefined
-        let bVal: string | number | Date | undefined
+  // Bulk action handlers
+  const handleBulkAssign = useCallback(
+    (userId: string) => {
+      const user = USERS.find((u) => u.id === userId);
+      if (!user) return;
 
-        switch (sortField) {
-          case "status":
-            aVal = STATUS_OPTIONS.indexOf(a.status)
-            bVal = STATUS_OPTIONS.indexOf(b.status)
-            break
-          case "severity":
-            aVal = SEVERITY_OPTIONS.indexOf(a.severity)
-            bVal = SEVERITY_OPTIONS.indexOf(b.severity)
-            break
-          case "cveId":
-            aVal = a.cveId
-            bVal = b.cveId
-            break
-          case "title":
-            aVal = a.title
-            bVal = b.title
-            break
-          case "applicationFullName":
-            aVal = a.applicationFullName
-            bVal = b.applicationFullName
-            break
-          case "hostName":
-            aVal = a.hostName
-            bVal = b.hostName
-            break
-          case "daysOpen":
-            aVal = a.daysOpen
-            bVal = b.daysOpen
-            break
-          case "dueDate":
-            aVal = a.dueDate?.getTime() || Number.MAX_SAFE_INTEGER
-            bVal = b.dueDate?.getTime() || Number.MAX_SAFE_INTEGER
-            break
-          case "disposition":
-            aVal = a.disposition || "zzz"
-            bVal = b.disposition || "zzz"
-            break
-          case "crqNumber":
-            aVal = a.crqNumber || "zzz"
-            bVal = b.crqNumber || "zzz"
-            break
-          case "remediationCoordinator":
-            aVal = a.remediationCoordinator?.name || "zzz"
-            bVal = b.remediationCoordinator?.name || "zzz"
-            break
-          default:
-            return 0
+      selectedRows.forEach((row) => {
+        const rowNode = gridApi?.getRowNode(row.id);
+        if (rowNode) {
+          rowNode.setData({ ...row, vulnOwner: user.name });
         }
+      });
+      gridApi?.deselectAll();
+    },
+    [gridApi, selectedRows]
+  );
 
-        if (typeof aVal === "string" && typeof bVal === "string") {
-          return sortDirection === "asc"
-            ? aVal.localeCompare(bVal)
-            : bVal.localeCompare(aVal)
+  const handleBulkDisposition = useCallback(
+    (disposition: Disposition) => {
+      selectedRows.forEach((row) => {
+        const rowNode = gridApi?.getRowNode(row.id);
+        if (rowNode) {
+          rowNode.setData({ ...row, disposition });
         }
+      });
+      gridApi?.deselectAll();
+    },
+    [gridApi, selectedRows]
+  );
 
-        if (typeof aVal === "number" && typeof bVal === "number") {
-          return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+  const handleClearSelection = useCallback(() => {
+    gridApi?.deselectAll();
+  }, [gridApi]);
+
+  // Update filter state
+  useEffect(() => {
+    if (!gridApi) return;
+
+    const updateFilters = () => {
+      const filterModel = gridApi.getFilterModel();
+      const filters: Record<string, string[]> = {};
+      Object.entries(filterModel).forEach(([key, value]: [string, unknown]) => {
+        const filterValue = value as { values?: string[]; filter?: string };
+        if (filterValue?.values) {
+          filters[key] = filterValue.values;
+        } else if (filterValue?.filter) {
+          filters[key] = [filterValue.filter];
         }
+      });
+      setActiveFilters(filters);
+    };
 
-        return 0
-      })
-    }
+    gridApi.addEventListener("filterChanged", updateFilters);
+    return () => {
+      gridApi.removeEventListener("filterChanged", updateFilters);
+    };
+  }, [gridApi]);
 
-    return result
-  }, [
-    vulnerabilities,
-    searchQuery,
-    statusFilter,
-    severityFilter,
-    dispositionFilter,
-    applicationFilter,
-    coordinatorFilter,
-    sortField,
-    sortDirection,
-  ])
+  const handleRemoveFilter = useCallback(
+    (field: string) => {
+      const filterInstance = gridApi?.getFilterInstance(field);
+      if (filterInstance) {
+        filterInstance.setModel(null);
+        gridApi?.onFilterChanged();
+      }
+    },
+    [gridApi]
+  );
 
-  // Pagination
-  const totalPages = Math.ceil(filteredVulnerabilities.length / ITEMS_PER_PAGE)
-  const paginatedVulnerabilities = filteredVulnerabilities.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
-
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("asc")
-    }
-  }
-
-  const handleRowClick = (vulnerability: Vulnerability) => {
-    setSelectedVulnerability(vulnerability)
-    setSheetOpen(true)
-  }
-
-  const handleSave = (updated: Vulnerability) => {
-    setVulnerabilities((prev) =>
-      prev.map((v) => (v.id === updated.id ? updated : v))
-    )
-    setSelectedVulnerability(null)
-  }
-
-  const removeFilter = (
-    type: "status" | "severity" | "disposition" | "application" | "coordinator",
-    value: string
-  ) => {
-    switch (type) {
-      case "status":
-        setStatusFilter(statusFilter.filter((s) => s !== value))
-        break
-      case "severity":
-        setSeverityFilter(severityFilter.filter((s) => s !== value))
-        break
-      case "disposition":
-        setDispositionFilter(dispositionFilter.filter((s) => s !== value))
-        break
-      case "application":
-        setApplicationFilter(applicationFilter.filter((s) => s !== value))
-        break
-      case "coordinator":
-        setCoordinatorFilter(coordinatorFilter.filter((s) => s !== value))
-        break
-    }
-  }
-
-  const clearAllFilters = () => {
-    setStatusFilter([])
-    setSeverityFilter([])
-    setDispositionFilter([])
-    setApplicationFilter([])
-    setCoordinatorFilter([])
-    setSearchQuery("")
-  }
-
-  const hasActiveFilters =
-    statusFilter.length > 0 ||
-    severityFilter.length > 0 ||
-    dispositionFilter.length > 0 ||
-    applicationFilter.length > 0 ||
-    coordinatorFilter.length > 0
-
-  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1
-  const endItem = Math.min(
-    currentPage * ITEMS_PER_PAGE,
-    filteredVulnerabilities.length
-  )
-
-  const toggleColumn = (column: keyof ColumnVisibility) => {
-    setColumnVisibility((prev) => ({
-      ...prev,
-      [column]: !prev[column],
-    }))
-  }
-
-  const clearSelection = () => {
-    setSelectedIds(new Set())
-  }
+  const handleSaveVulnerability = useCallback(
+    (updated: Vulnerability) => {
+      setRowData((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
+      const rowNode = gridApi?.getRowNode(updated.id);
+      if (rowNode) {
+        rowNode.setData(updated);
+      }
+    },
+    [gridApi]
+  );
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-[1800px] mx-auto p-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-foreground">
-            Vulnerability Triage
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Showing vulnerabilities assigned to Payments Technology
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <Card className="border-l-4 border-l-red-500">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Awaiting Disposition</p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {stats.awaiting}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-yellow-500">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">In Progress</p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {stats.inProgress}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-orange-500">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Pending Clear Scan</p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {stats.pendingScan}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-4">
-              <p className="text-sm text-muted-foreground">Resolved (last 30 days)</p>
-              <p className="text-2xl font-semibold text-foreground mt-1">
-                {stats.resolved}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Toolbar */}
-        <div className="mb-4 space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left side - Search and Filters */}
-            <div className="flex items-center gap-3 flex-1">
-              {/* Search */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by CVE, host, application, or title..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="pl-9 h-9"
-                />
-              </div>
-
-              {/* Filter buttons */}
-              <div className="flex items-center gap-2">
-                <FilterPopover
-                  label="Status"
-                  options={STATUS_OPTIONS}
-                  selected={statusFilter}
-                  onSelectionChange={(selected) => {
-                    setStatusFilter(selected)
-                    setCurrentPage(1)
-                  }}
-                />
-                <FilterPopover
-                  label="Severity"
-                  options={SEVERITY_OPTIONS}
-                  selected={severityFilter}
-                  onSelectionChange={(selected) => {
-                    setSeverityFilter(selected)
-                    setCurrentPage(1)
-                  }}
-                />
-                <FilterPopover
-                  label="Disposition"
-                  options={DISPOSITION_OPTIONS}
-                  selected={dispositionFilter}
-                  onSelectionChange={(selected) => {
-                    setDispositionFilter(selected)
-                    setCurrentPage(1)
-                  }}
-                />
-                <FilterPopover
-                  label="Application"
-                  options={applicationOptions}
-                  selected={applicationFilter}
-                  onSelectionChange={(selected) => {
-                    setApplicationFilter(selected)
-                    setCurrentPage(1)
-                  }}
-                />
-                <FilterPopover
-                  label="Coordinator"
-                  options={coordinatorOptions}
-                  selected={coordinatorFilter}
-                  onSelectionChange={(selected) => {
-                    setCoordinatorFilter(selected)
-                    setCurrentPage(1)
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Right side - View options */}
-            <div className="flex items-center gap-2">
-              {/* View Density Toggle */}
-              <div className="flex items-center border rounded-md">
-                <Button
-                  variant={viewDensity === "compact" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 rounded-r-none text-xs"
-                  onClick={() => setViewDensity("compact")}
-                >
-                  Compact
+    <div className="flex flex-col h-screen bg-background">
+      {/* Header */}
+      <header className="border-b px-6 py-4 shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold">Vulnerability Remediation</h1>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  CIO: {selectedCio.name}
+                  <ChevronDown className="h-4 w-4" />
                 </Button>
-                <Button
-                  variant={viewDensity === "comfortable" ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-8 px-3 rounded-l-none text-xs"
-                  onClick={() => setViewDensity("comfortable")}
-                >
-                  Comfortable
-                </Button>
-              </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="start">
+                <div className="space-y-1">
+                  {CIO_TEAMS.map((team) => (
+                    <Button
+                      key={team.id}
+                      variant={selectedCio.id === team.id ? "secondary" : "ghost"}
+                      className="w-full justify-start"
+                      onClick={() => setSelectedCio(team)}
+                    >
+                      {team.name}
+                    </Button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">Last refreshed: 12 minutes ago</span>
+            <Button variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      </header>
 
-              {/* Column Visibility */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8">
-                    <Columns3 className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {(Object.keys(columnVisibility) as Array<keyof ColumnVisibility>).map(
-                    (column) => (
-                      <DropdownMenuCheckboxItem
-                        key={column}
-                        checked={columnVisibility[column]}
-                        onCheckedChange={() => toggleColumn(column)}
-                      >
-                        {COLUMN_LABELS[column]}
-                      </DropdownMenuCheckboxItem>
-                    )
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+      {/* Stats & Chart */}
+      <div className="px-6 py-4 space-y-4 shrink-0">
+        <StatCards counts={stats} />
+        <SeverityStatusChart data={chartData} />
+      </div>
+
+      {/* Toolbar */}
+      <div className="px-6 py-3 border-b shrink-0 space-y-3">
+        <div className="flex items-center gap-4">
+          {/* Quick Filter */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Quick filter across all columns..."
+              value={quickFilterText}
+              onChange={(e) => handleQuickFilter(e.target.value)}
+              className="pl-9"
+            />
           </div>
 
-          {/* Active filter chips */}
-          {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2">
-              {statusFilter.map((status) => (
-                <Badge
-                  key={`status-${status}`}
-                  variant="secondary"
-                  className="gap-1 pr-1"
-                >
-                  {status}
-                  <button
-                    onClick={() => removeFilter("status", status)}
-                    className="ml-1 hover:bg-muted rounded p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {severityFilter.map((severity) => (
-                <Badge
-                  key={`severity-${severity}`}
-                  variant="secondary"
-                  className="gap-1 pr-1"
-                >
-                  {severity}
-                  <button
-                    onClick={() => removeFilter("severity", severity)}
-                    className="ml-1 hover:bg-muted rounded p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {dispositionFilter.map((disposition) => (
-                <Badge
-                  key={`disposition-${disposition}`}
-                  variant="secondary"
-                  className="gap-1 pr-1"
-                >
-                  {disposition}
-                  <button
-                    onClick={() => removeFilter("disposition", disposition)}
-                    className="ml-1 hover:bg-muted rounded p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {applicationFilter.map((app) => (
-                <Badge
-                  key={`app-${app}`}
-                  variant="secondary"
-                  className="gap-1 pr-1"
-                >
-                  {app}
-                  <button
-                    onClick={() => removeFilter("application", app)}
-                    className="ml-1 hover:bg-muted rounded p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              {coordinatorFilter.map((coord) => (
-                <Badge
-                  key={`coord-${coord}`}
-                  variant="secondary"
-                  className="gap-1 pr-1"
-                >
-                  {coord}
-                  <button
-                    onClick={() => removeFilter("coordinator", coord)}
-                    className="ml-1 hover:bg-muted rounded p-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              ))}
-              <button
-                onClick={clearAllFilters}
-                className="text-sm text-muted-foreground hover:text-foreground underline"
-              >
-                Clear all
-              </button>
-            </div>
-          )}
+          {/* Export buttons */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportExcel}>
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export to Excel
+                {selectedRows.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {selectedRows.length} selected
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportCsv}>
+                <Download className="h-4 w-4 mr-2" />
+                Export to CSV
+                {selectedRows.length > 0 && (
+                  <Badge variant="secondary" className="ml-2">
+                    {selectedRows.length} selected
+                  </Badge>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
-        {/* Bulk Action Bar */}
-        {selectedIds.size > 0 && (
-          <div className="mb-4 flex items-center gap-4 p-3 bg-muted rounded-lg">
-            <span className="text-sm font-medium">
-              {selectedIds.size} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <Users className="h-3.5 w-3.5" />
-                Assign Coordinator
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
-                Set Disposition
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                <Download className="h-3.5 w-3.5" />
-                Export
-              </Button>
-            </div>
+        {/* Active filter chips */}
+        {Object.keys(activeFilters).length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm text-muted-foreground">Active filters:</span>
+            {Object.entries(activeFilters).map(([field, values]) => (
+              <Badge key={field} variant="secondary" className="gap-1">
+                {field}: {values.join(", ")}
+                <button
+                  onClick={() => handleRemoveFilter(field)}
+                  className="ml-1 hover:bg-muted rounded-full"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 ml-auto"
-              onClick={clearSelection}
+              onClick={() => gridApi?.setFilterModel(null)}
+              className="text-xs"
             >
-              Cancel
+              Clear all
             </Button>
           </div>
         )}
-
-        {/* Table */}
-        <VulnerabilityTable
-          vulnerabilities={paginatedVulnerabilities}
-          onRowClick={handleRowClick}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          columnVisibility={columnVisibility}
-          viewDensity={viewDensity}
-          selectedIds={selectedIds}
-          onSelectionChange={setSelectedIds}
-        />
-
-        {/* Pagination */}
-        <div className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredVulnerabilities.length > 0 ? startItem : 0}–{endItem} of{" "}
-            {filteredVulnerabilities.length.toLocaleString()}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground px-2">
-              Page {currentPage} of {totalPages || 1}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Detail Sheet */}
-        <DetailSheet
-          vulnerability={selectedVulnerability}
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          onSave={handleSave}
-        />
       </div>
+
+      {/* AG Grid */}
+      <div className="flex-1 px-6 pb-6">
+        <div className="h-full w-full">
+          <AgGridReact
+            ref={gridRef}
+            theme={theme}
+            rowData={rowData}
+            columnDefs={columnDefs}
+            defaultColDef={defaultColDef}
+            getRowId={(params) => params.data.id}
+            onGridReady={onGridReady}
+            onRowClicked={onRowClicked}
+            onSelectionChanged={onSelectionChanged}
+            rowSelection="multiple"
+            suppressRowClickSelection={true}
+            rowMultiSelectWithClick={false}
+            enableRangeSelection={true}
+            enableCharts={true}
+            cellSelection={true}
+            pagination={true}
+            paginationPageSize={50}
+            paginationPageSizeSelector={[25, 50, 100, 200]}
+            animateRows={true}
+            enableCellTextSelection={true}
+            suppressMenuHide={false}
+            tooltipShowDelay={500}
+            floatingFiltersHeight={36}
+            headerHeight={40}
+            rowHeight={36}
+            statusBar={statusBar}
+            sideBar={{
+              toolPanels: [
+                {
+                  id: "columns",
+                  labelDefault: "Columns",
+                  labelKey: "columns",
+                  iconKey: "columns",
+                  toolPanel: "agColumnsToolPanel",
+                },
+                {
+                  id: "filters",
+                  labelDefault: "Filters",
+                  labelKey: "filters",
+                  iconKey: "filter",
+                  toolPanel: "agFiltersToolPanel",
+                },
+              ],
+              defaultToolPanel: "",
+            }}
+            getContextMenuItems={getContextMenuItems}
+            rowGroupPanelShow="always"
+            groupDisplayType="singleColumn"
+            autoGroupColumnDef={{
+              minWidth: 200,
+              cellRendererParams: {
+                suppressCount: false,
+              },
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Bulk Action Bar */}
+      {selectedRows.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg px-4 py-3 flex items-center gap-4 z-50">
+          <span className="text-sm font-medium">{selectedRows.length} selected</span>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Users className="h-4 w-4 mr-2" />
+                Assign Owner
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56" align="start">
+              <div className="space-y-1">
+                {USERS.map((user) => (
+                  <Button
+                    key={user.id}
+                    variant="ghost"
+                    className="w-full justify-start text-sm"
+                    onClick={() => handleBulkAssign(user.id)}
+                  >
+                    {user.name}
+                  </Button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Select onValueChange={(value) => handleBulkDisposition(value as Disposition)}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Set Disposition" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Fix">Fix</SelectItem>
+              <SelectItem value="Defer">Defer</SelectItem>
+              <SelectItem value="Mitigate">Mitigate</SelectItem>
+              <SelectItem value="Accept Risk">Accept Risk</SelectItem>
+              <SelectItem value="False Positive">False Positive</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
+            <Download className="h-4 w-4 mr-2" />
+            Export Selected
+          </Button>
+
+          <Button variant="ghost" size="sm" onClick={handleClearSelection}>
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {/* Detail Sheet */}
+      <DetailSheet
+        vulnerability={selectedVuln}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        onSave={handleSaveVulnerability}
+      />
     </div>
-  )
+  );
 }

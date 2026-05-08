@@ -1,820 +1,40 @@
-import type { Vulnerability, ColumnVisibility } from "./types"
+import type {
+  Vulnerability,
+  TriageStatus,
+  Severity,
+  Disposition,
+  OperatingEnvironment,
+  VerificationStatus,
+  Source,
+  Blocker,
+  ActivityLogEntry,
+  CioTeam,
+  User,
+  SparklineDataPoint,
+  SeverityStatusData,
+} from "./types";
 
-export const mockVulnerabilities: Vulnerability[] = [
-  {
-    id: "1",
-    gisId: "GIS-2024-001234",
-    qualysId: "QID-78234",
-    beId: "BE-00123",
-    applicationId: "APP-PAY-001",
-    cveId: "CVE-2024-38213",
-    applicationFullName: "Payments Gateway",
-    applicationStatus: "Production",
-    applicationManagerContact: "james.wilson@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    runbookOwner: "Platform Engineering",
-    financialHierarchy: "Technology > Payments > Core Processing",
-    hostName: "pay-gw-prd-001.bank.internal",
-    ipAddresses: ["10.1.100.45", "10.1.100.46"],
-    fqdn: "pay-gw-prd-001.payments.bank.internal",
-    osName: "Red Hat Enterprise Linux 8.6",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 1 Critical",
-    title: "Remote Code Execution in Authentication Module",
-    description: "A remote code execution vulnerability exists in the authentication module that could allow an attacker to execute arbitrary code with elevated privileges. This affects all versions prior to 2.4.1.",
-    technicalDescription: "The vulnerability exists in the JWT token validation routine where improper input sanitization allows for injection of malicious payloads. An attacker with network access can craft a specially formed authentication request that bypasses security controls and achieves code execution in the context of the application service account.",
-    source: "Qualys",
-    workstreamObservationType: "Critical Infrastructure",
-    status: "Awaiting Disposition",
-    statusDetails: "Pending security team review",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-15"),
-    dateLastSeen: new Date("2025-05-06"),
-    daysOpen: 173,
-    dueDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    dueDateStatus: "Overdue",
-    pastDue: true,
-    severity: "Critical",
-    severityRisk: "Critical",
-    cvssScore: 9.8,
-    vendorRiskLevel: "Critical",
-    consequenceModel: "Data Breach",
-    firstConsequenceDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    gisExternalFlag: true,
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-15T09:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Security Scanner",
-        action: "confirmed vulnerability presence",
-        timestamp: new Date("2025-05-06T14:30:00"),
-      },
-    ],
-  },
-  {
-    id: "2",
-    gisId: "GIS-2024-001456",
-    qualysId: "QID-78456",
-    applicationId: "APP-AUTH-002",
-    cveId: "CVE-2024-42156",
-    applicationFullName: "Authentication Service",
-    applicationStatus: "Production",
-    applicationManagerContact: "mike.johnson@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    remediationCoordinator: { name: "John Smith" },
-    runbookOwner: "Identity Team",
-    financialHierarchy: "Technology > Security > Identity",
-    hostName: "auth-svc-prd-003.bank.internal",
-    ipAddresses: ["10.2.50.12"],
-    fqdn: "auth-svc-prd-003.identity.bank.internal",
-    osName: "Ubuntu 22.04 LTS",
-    deviceType: "Container",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 1 Critical",
-    title: "SQL Injection in Search Functionality",
-    description: "SQL injection vulnerability in the search functionality allows authenticated users to extract sensitive data from the database through crafted input parameters.",
-    source: "Internal Scan",
-    status: "In Progress",
-    statusDetails: "Patch being tested",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-10"),
-    dateLastSeen: new Date("2025-05-05"),
-    daysOpen: 180,
-    dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    dueDateStatus: "On Track",
-    pastDue: false,
-    severity: "High",
-    severityRisk: "High",
-    cvssScore: 8.1,
-    vendorRiskLevel: "High",
-    gisExternalFlag: false,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sat 5/9 00:00–08:00 ET",
-    identifiedBlockers: ["Testing and partner / peer team dependencies"],
-    expectedRemediationDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000123456",
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-10T10:00:00"),
-      },
-      {
-        id: "2",
-        userName: "John Smith",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "John Smith",
-        action: "added",
-        field: "CRQ",
-        newValue: "CRQ000000123456",
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
-      },
-      {
-        id: "4",
-        userName: "John Smith",
-        action: "moved status from",
-        oldValue: "Awaiting Disposition",
-        newValue: "In Progress",
-        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    lastSavedBy: "John Smith",
-  },
-  {
-    id: "3",
-    gisId: "GIS-2024-001789",
-    qualysId: "QID-78789",
-    applicationId: "APP-MSG-003",
-    cveId: "CVE-2024-35218",
-    applicationFullName: "Customer Portal",
-    applicationStatus: "Production",
-    applicationManagerContact: "lisa.wong@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "david.miller@bank.internal",
-    remediationCoordinator: { name: "Sarah Johnson" },
-    runbookOwner: "Portal Team",
-    hostName: "portal-web-prd-002.bank.internal",
-    ipAddresses: ["10.3.25.88", "10.3.25.89"],
-    osName: "Windows Server 2022",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-West",
-    esmType: "Tier 2",
-    title: "Cross-Site Scripting in Message Rendering",
-    description: "Cross-site scripting (XSS) vulnerability in the message rendering component allows injection of malicious scripts through specially crafted messages.",
-    source: "Qualys",
-    status: "Pending Clear Scan",
-    statusDetails: "Remediation applied, awaiting verification scan",
-    verificationStatus: "Pending",
-    dateObserved: new Date("2024-11-01"),
-    dateLastSeen: new Date("2025-05-01"),
-    daysOpen: 189,
-    dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Medium",
-    cvssScore: 6.1,
-    gisExternalFlag: false,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sun 5/10 00:00–08:00 ET",
-    expectedRemediationDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000789012",
-    remediationComplete: true,
-    healthCheckTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-01T08:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Sarah Johnson",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "Sarah Johnson",
-        action: "marked",
-        field: "Remediation Complete",
-        newValue: "Yes",
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-      },
-      {
-        id: "4",
-        userName: "Sarah Johnson",
-        action: "moved status from",
-        oldValue: "In Progress",
-        newValue: "Pending Clear Scan",
-        timestamp: new Date(Date.now() - 12 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 12 * 60 * 60 * 1000),
-    lastSavedBy: "Sarah Johnson",
-  },
-  {
-    id: "4",
-    gisId: "GIS-2024-002001",
-    qualysId: "QID-79001",
-    applicationId: "APP-TRD-004",
-    cveId: "CVE-2024-29847",
-    applicationFullName: "Trade Settlement Engine",
-    applicationStatus: "Production",
-    applicationManagerContact: "robert.taylor@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    remediationCoordinator: { name: "Mike Davis" },
-    runbookOwner: "Trading Platform Team",
-    hostName: "trade-eng-prd-005.bank.internal",
-    ipAddresses: ["10.4.80.201"],
-    osName: "Red Hat Enterprise Linux 9.1",
-    deviceType: "Physical Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 1 Critical",
-    title: "Buffer Overflow in Transaction Parsing",
-    description: "Buffer overflow vulnerability in the transaction parsing module could lead to denial of service or potential code execution.",
-    source: "Internal Scan",
-    status: "Resolved",
-    statusDetails: "Verified remediated",
-    verificationStatus: "Verified",
-    dateObserved: new Date("2024-10-20"),
-    dateLastSeen: new Date("2024-11-06"),
-    daysOpen: 17,
-    remediatedDate: new Date("2024-11-06"),
-    pastDue: false,
-    severity: "High",
-    cvssScore: 7.5,
-    gisExternalFlag: true,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sat 5/9 08:00–16:00 ET",
-    expectedRemediationDate: new Date("2024-11-05"),
-    crqNumber: "CRQ000000345678",
-    remediationComplete: true,
-    healthCheckTime: new Date("2024-11-06T10:00:00"),
-    healthCheckComplete: true,
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-10-20T14:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Mike Davis",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date("2024-10-25T09:00:00"),
-      },
-      {
-        id: "3",
-        userName: "Mike Davis",
-        action: "marked",
-        field: "Remediation Complete",
-        newValue: "Yes",
-        timestamp: new Date("2024-11-05T16:00:00"),
-      },
-      {
-        id: "4",
-        userName: "Mike Davis",
-        action: "marked",
-        field: "Health Check Complete",
-        newValue: "Yes",
-        timestamp: new Date("2024-11-06T10:00:00"),
-      },
-      {
-        id: "5",
-        userName: "System",
-        action: "moved status from",
-        oldValue: "Pending Clear Scan",
-        newValue: "Resolved",
-        timestamp: new Date("2024-11-06T10:05:00"),
-      },
-    ],
-    lastSavedAt: new Date("2024-11-06T10:00:00"),
-    lastSavedBy: "Mike Davis",
-  },
-  {
-    id: "5",
-    gisId: "GIS-2024-002234",
-    applicationId: "APP-FRD-005",
-    cveId: "CVE-2024-31982",
-    applicationFullName: "Risk Reporting Platform",
-    applicationStatus: "Production",
-    applicationManagerContact: "jennifer.brown@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "david.miller@bank.internal",
-    hostName: "risk-rpt-prd-001.bank.internal",
-    ipAddresses: ["10.5.60.55", "10.5.60.56", "10.5.60.57"],
-    osName: "Windows Server 2019",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-Central",
-    esmType: "Tier 1 Critical",
-    title: "Authentication Bypass via JWT Manipulation",
-    description: "Authentication bypass vulnerability allows unauthenticated access to admin functions through manipulated JWT tokens.",
-    technicalDescription: "The JWT signature verification routine contains a logic flaw that allows tokens signed with the 'none' algorithm to be accepted. An attacker can forge administrative tokens by setting alg=none and removing the signature portion of the JWT.",
-    source: "Qualys",
-    status: "Awaiting Disposition",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-18"),
-    dateLastSeen: new Date("2025-05-07"),
-    daysOpen: 171,
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Critical",
-    severityRisk: "Critical",
-    cvssScore: 9.1,
-    vendorRiskLevel: "Critical",
-    gisExternalFlag: true,
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-18T11:00:00"),
-      },
-    ],
-  },
-  {
-    id: "6",
-    gisId: "GIS-2024-002567",
-    qualysId: "QID-79234",
-    applicationId: "APP-ACC-006",
-    cveId: "CVE-2024-28995",
-    applicationFullName: "Trade Settlement Engine",
-    applicationStatus: "Production",
-    applicationManagerContact: "thomas.clark@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    remediationCoordinator: { name: "Emily Chen" },
-    hostName: "acct-mgmt-prd-002.bank.internal",
-    ipAddresses: ["10.6.40.33"],
-    osName: "Ubuntu 20.04 LTS",
-    deviceType: "Container",
-    operatingEnvironment: "Production",
-    displayRegion: "EU-West",
-    esmType: "Tier 2",
-    title: "Information Disclosure in Error Messages",
-    description: "Information disclosure vulnerability in error messages may reveal internal system paths and configuration details.",
-    source: "Internal Scan",
-    status: "In Progress",
-    statusDetails: "Architecture review in progress",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-05"),
-    dateLastSeen: new Date("2025-05-04"),
-    daysOpen: 185,
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Low",
-    cvssScore: 3.7,
-    gisExternalFlag: false,
-    disposition: "Accept Risk",
-    ctiRemediation: false,
-    identifiedBlockers: [
-      "Application re-design / re-architecture required",
-      "Third-party dependencies",
-    ],
-    expectedRemediationDate: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-    erpExceptionId: "ERP-2024-00567",
-    erpExceptionRequestStatus: "Approved",
-    erpExceptionRiskDecision: "Accept with Monitoring",
-    erpExceptionExpirationDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-05T16:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Emily Chen",
-        action: "set",
-        field: "Disposition",
-        newValue: "Accept Risk",
-        timestamp: new Date(Date.now() - 120 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "Emily Chen",
-        action: "added ERP Exception",
-        field: "ERP Exception ID",
-        newValue: "ERP-2024-00567",
-        timestamp: new Date(Date.now() - 96 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 96 * 60 * 60 * 1000),
-    lastSavedBy: "Emily Chen",
-  },
-  {
-    id: "7",
-    gisId: "GIS-2024-002890",
-    qualysId: "QID-79567",
-    applicationId: "APP-MOB-007",
-    cveId: "CVE-2024-40711",
-    applicationFullName: "Payments Gateway",
-    applicationStatus: "Production",
-    applicationManagerContact: "amanda.white@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    remediationCoordinator: { name: "David Wilson" },
-    hostName: "mobile-api-prd-004.bank.internal",
-    ipAddresses: ["10.7.90.101", "10.7.90.102"],
-    osName: "Red Hat Enterprise Linux 8.8",
-    deviceType: "Container",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 1 Critical",
-    title: "Insecure Deserialization in Session Handling",
-    description: "Insecure deserialization vulnerability in the session handling mechanism could allow remote code execution.",
-    source: "Qualys",
-    status: "In Progress",
-    statusDetails: "Vendor patch being evaluated",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-12"),
-    dateLastSeen: new Date("2025-05-06"),
-    daysOpen: 177,
-    dueDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "High",
-    cvssScore: 8.6,
-    vendorRiskLevel: "High",
-    gisExternalFlag: true,
-    disposition: "Mitigate",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sat 5/16 00:00–08:00 ET",
-    identifiedBlockers: [
-      "Vendor / internal package availability",
-      "Limited central (bulk) remediation capabilities",
-    ],
-    expectedRemediationDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000567890",
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-12T13:00:00"),
-      },
-      {
-        id: "2",
-        userName: "David Wilson",
-        action: "set",
-        field: "Disposition",
-        newValue: "Mitigate",
-        timestamp: new Date(Date.now() - 72 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "David Wilson",
-        action: "added blocker",
-        field: "Blocker",
-        newValue: "Vendor / internal package availability",
-        timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 48 * 60 * 60 * 1000),
-    lastSavedBy: "David Wilson",
-  },
-  {
-    id: "8",
-    gisId: "GIS-2024-003123",
-    qualysId: "QID-79890",
-    applicationId: "APP-DOC-008",
-    cveId: "CVE-2024-37085",
-    applicationFullName: "Customer Portal",
-    applicationStatus: "Production",
-    applicationManagerContact: "kevin.martinez@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "david.miller@bank.internal",
-    remediationCoordinator: { name: "Lisa Taylor" },
-    hostName: "doc-mgmt-prd-001.bank.internal",
-    ipAddresses: ["10.8.20.77"],
-    osName: "Windows Server 2022",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-West",
-    esmType: "Tier 2",
-    title: "Path Traversal in File Upload",
-    description: "Path traversal vulnerability in the file upload functionality allows reading arbitrary files from the server.",
-    source: "Internal Scan",
-    status: "Pending Clear Scan",
-    statusDetails: "Patch applied, scanning scheduled",
-    verificationStatus: "Pending",
-    dateObserved: new Date("2024-10-28"),
-    dateLastSeen: new Date("2025-05-02"),
-    daysOpen: 193,
-    dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Medium",
-    cvssScore: 5.9,
-    gisExternalFlag: false,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sun 5/10 08:00–16:00 ET",
-    expectedRemediationDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000901234",
-    remediationComplete: true,
-    healthCheckTime: new Date(Date.now() + 12 * 60 * 60 * 1000),
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-10-28T09:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Lisa Taylor",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date(Date.now() - 144 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "Lisa Taylor",
-        action: "moved status from",
-        oldValue: "Awaiting Disposition",
-        newValue: "In Progress",
-        timestamp: new Date(Date.now() - 144 * 60 * 60 * 1000),
-      },
-      {
-        id: "4",
-        userName: "Lisa Taylor",
-        action: "marked",
-        field: "Remediation Complete",
-        newValue: "Yes",
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      },
-      {
-        id: "5",
-        userName: "Lisa Taylor",
-        action: "moved status from",
-        oldValue: "In Progress",
-        newValue: "Pending Clear Scan",
-        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 8 * 60 * 60 * 1000),
-    lastSavedBy: "Lisa Taylor",
-  },
-  {
-    id: "9",
-    gisId: "GIS-2024-003456",
-    applicationId: "APP-CMP-009",
-    cveId: "CVE-2024-23334",
-    applicationFullName: "Risk Reporting Platform",
-    applicationStatus: "Production",
-    applicationManagerContact: "patricia.garcia@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    hostName: "compliance-rpt-prd-003.bank.internal",
-    ipAddresses: ["10.9.35.44"],
-    osName: "Red Hat Enterprise Linux 9.0",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-Central",
-    esmType: "Tier 2",
-    title: "SSRF in Report Generation Module",
-    description: "Server-side request forgery (SSRF) vulnerability in the report generation module allows access to internal network resources.",
-    source: "Qualys",
-    status: "Awaiting Disposition",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2024-11-19"),
-    dateLastSeen: new Date("2025-05-07"),
-    daysOpen: 170,
-    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Medium",
-    cvssScore: 6.5,
-    gisExternalFlag: false,
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-19T07:00:00"),
-      },
-    ],
-  },
-  {
-    id: "10",
-    gisId: "GIS-2024-003789",
-    qualysId: "QID-80123",
-    applicationId: "APP-EML-010",
-    cveId: "CVE-2024-45519",
-    applicationFullName: "Authentication Service",
-    applicationStatus: "Production",
-    applicationManagerContact: "steven.lee@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "david.miller@bank.internal",
-    remediationCoordinator: { name: "Robert Brown" },
-    hostName: "email-notify-prd-002.bank.internal",
-    ipAddresses: ["10.10.15.88"],
-    osName: "Ubuntu 22.04 LTS",
-    deviceType: "Container",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 3",
-    title: "Template Injection in Email Rendering",
-    description: "Reported vulnerability in email template rendering was determined to be a false positive after security review.",
-    source: "Internal Scan",
-    status: "Resolved",
-    statusDetails: "Closed as False Positive",
-    verificationStatus: "N/A",
-    dateObserved: new Date("2024-11-08"),
-    dateLastSeen: new Date("2024-11-08"),
-    daysOpen: 2,
-    remediatedDate: new Date("2024-11-10"),
-    pastDue: false,
-    severity: "Low",
-    cvssScore: 2.3,
-    gisExternalFlag: false,
-    disposition: "False Positive",
-    ctiRemediation: false,
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2024-11-08T15:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Robert Brown",
-        action: "set",
-        field: "Disposition",
-        newValue: "False Positive",
-        timestamp: new Date("2024-11-10T09:00:00"),
-      },
-      {
-        id: "3",
-        userName: "Robert Brown",
-        action: "moved status from",
-        oldValue: "Awaiting Disposition",
-        newValue: "Resolved",
-        timestamp: new Date("2024-11-10T09:05:00"),
-      },
-    ],
-    lastSavedAt: new Date("2024-11-10T09:00:00"),
-    lastSavedBy: "Robert Brown",
-  },
-  {
-    id: "11",
-    gisId: "GIS-2024-004012",
-    qualysId: "QID-80456",
-    applicationId: "APP-PAY-011",
-    cveId: "CVE-2025-21234",
-    applicationFullName: "Payments Gateway",
-    applicationStatus: "Production",
-    applicationManagerContact: "james.wilson@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "sarah.chen@bank.internal",
-    remediationCoordinator: { name: "Alex Turner" },
-    hostName: "pay-proc-prd-006.bank.internal",
-    ipAddresses: ["10.1.100.90", "10.1.100.91"],
-    osName: "Red Hat Enterprise Linux 9.2",
-    deviceType: "Physical Server",
-    operatingEnvironment: "Production",
-    displayRegion: "US-East",
-    esmType: "Tier 1 Critical",
-    title: "Privilege Escalation via API Endpoint",
-    description: "A privilege escalation vulnerability in the payment processing API allows standard users to perform administrative operations.",
-    source: "Qualys",
-    status: "In Progress",
-    statusDetails: "Code fix under review",
-    verificationStatus: "Confirmed",
-    dateObserved: new Date("2025-01-15"),
-    dateLastSeen: new Date("2025-05-07"),
-    daysOpen: 113,
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "High",
-    cvssScore: 7.8,
-    vendorRiskLevel: "High",
-    gisExternalFlag: true,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sat 5/16 08:00–16:00 ET",
-    expectedRemediationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000234567",
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2025-01-15T11:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Alex Turner",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date(Date.now() - 168 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "Alex Turner",
-        action: "added",
-        field: "CRQ",
-        newValue: "CRQ000000234567",
-        timestamp: new Date(Date.now() - 120 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 120 * 60 * 60 * 1000),
-    lastSavedBy: "Alex Turner",
-  },
-  {
-    id: "12",
-    gisId: "GIS-2024-004345",
-    applicationId: "APP-CRM-012",
-    cveId: "CVE-2025-18765",
-    applicationFullName: "Trade Settlement Engine",
-    applicationStatus: "Production",
-    applicationManagerContact: "nancy.adams@bank.internal",
-    cioDisplayName: "Payments Technology",
-    techExecutiveContact: "david.miller@bank.internal",
-    hostName: "crm-app-prd-001.bank.internal",
-    ipAddresses: ["10.11.50.22"],
-    osName: "Windows Server 2022",
-    deviceType: "Virtual Server",
-    operatingEnvironment: "Production",
-    displayRegion: "EU-Central",
-    esmType: "Tier 2",
-    title: "Improper Access Control in Customer Data API",
-    description: "Improper access control allows authenticated users to access customer data outside their authorized scope.",
-    source: "Internal Scan",
-    status: "Pending Clear Scan",
-    statusDetails: "Access control fix deployed",
-    verificationStatus: "Pending",
-    dateObserved: new Date("2025-02-10"),
-    dateLastSeen: new Date("2025-05-05"),
-    daysOpen: 87,
-    dueDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000),
-    pastDue: false,
-    severity: "Medium",
-    cvssScore: 5.4,
-    gisExternalFlag: false,
-    disposition: "Fix",
-    ctiRemediation: true,
-    requestedPatchWindow: "Sun 5/17 08:00–16:00 ET",
-    expectedRemediationDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-    crqNumber: "CRQ000000456789",
-    remediationComplete: true,
-    healthCheckTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    activityLog: [
-      {
-        id: "1",
-        userName: "System",
-        action: "created vulnerability record",
-        timestamp: new Date("2025-02-10T14:00:00"),
-      },
-      {
-        id: "2",
-        userName: "Jennifer Kim",
-        action: "set",
-        field: "Disposition",
-        newValue: "Fix",
-        timestamp: new Date(Date.now() - 240 * 60 * 60 * 1000),
-      },
-      {
-        id: "3",
-        userName: "Jennifer Kim",
-        action: "marked",
-        field: "Remediation Complete",
-        newValue: "Yes",
-        timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000),
-      },
-    ],
-    lastSavedAt: new Date(Date.now() - 36 * 60 * 60 * 1000),
-    lastSavedBy: "Jennifer Kim",
-  },
-]
+// CIO Teams
+export const CIO_TEAMS: CioTeam[] = [
+  { id: "1", name: "Payments Technology", code: "PAY" },
+  { id: "2", name: "Trading Systems", code: "TRD" },
+  { id: "3", name: "Risk & Compliance", code: "RSK" },
+  { id: "4", name: "Consumer Banking", code: "CNB" },
+  { id: "5", name: "Wealth Management", code: "WLT" },
+];
 
+// Patch windows for scheduling
 export const patchWindows = [
   "Sat 5/9 00:00–08:00 ET",
   "Sat 5/9 08:00–16:00 ET",
-  "Sat 5/9 16:00–23:59 ET",
   "Sun 5/10 00:00–08:00 ET",
   "Sun 5/10 08:00–16:00 ET",
-  "Sun 5/10 16:00–23:59 ET",
-  "Mon 5/11 00:00–08:00 ET",
   "Sat 5/16 00:00–08:00 ET",
   "Sat 5/16 08:00–16:00 ET",
-  "Sun 5/17 00:00–08:00 ET",
-  "Sun 5/17 08:00–16:00 ET",
-]
+];
 
-export const blockerOptions = [
+// Blocker options for disposition
+export const blockerOptions: Blocker[] = [
   "Vendor / internal package availability",
   "Testing and partner / peer team dependencies",
   "Limited central (bulk) remediation capabilities",
@@ -825,18 +45,436 @@ export const blockerOptions = [
   "No patch available",
   "False positives in Vulnerability and FOSS data",
   "Data and reporting limitations",
-] as const
+];
 
-export const defaultColumnVisibility: ColumnVisibility = {
-  status: true,
-  severity: true,
-  cveId: true,
-  title: true,
-  applicationFullName: true,
-  hostName: true,
-  daysOpen: true,
-  dueDate: true,
-  disposition: true,
-  crqNumber: true,
-  remediationCoordinator: true,
+// Users for assignments
+export const USERS: User[] = [
+  { id: "1", name: "Sarah Chen", email: "sarah.chen@bank.internal" },
+  { id: "2", name: "James Wilson", email: "james.wilson@bank.internal" },
+  { id: "3", name: "Maria Garcia", email: "maria.garcia@bank.internal" },
+  { id: "4", name: "David Kim", email: "david.kim@bank.internal" },
+  { id: "5", name: "Emily Johnson", email: "emily.johnson@bank.internal" },
+  { id: "6", name: "Michael Brown", email: "michael.brown@bank.internal" },
+  { id: "7", name: "Lisa Anderson", email: "lisa.anderson@bank.internal" },
+  { id: "8", name: "Robert Taylor", email: "robert.taylor@bank.internal" },
+];
+
+const APPLICATIONS = [
+  "Payments Gateway",
+  "Authentication Service",
+  "Customer Portal",
+  "Trade Settlement Engine",
+  "Risk Reporting Platform",
+  "Wire Transfer System",
+  "Card Processing",
+  "Treasury Services",
+  "FX Trading Platform",
+  "Mortgage Origination",
+  "Account Management",
+  "Fraud Detection",
+  "Compliance Monitor",
+  "Market Data Feed",
+  "Order Management",
+];
+
+const TECHNOLOGIES = [
+  { name: "Apache", version: "2.4.41" },
+  { name: "OpenSSL", version: "1.1.1k" },
+  { name: "Windows Server", version: "2019" },
+  { name: "Red Hat Enterprise Linux", version: "8.4" },
+  { name: "Java", version: "11.0.12" },
+  { name: "Tomcat", version: "9.0.45" },
+  { name: "MySQL", version: "8.0.27" },
+  { name: "Nginx", version: "1.18.0" },
+  { name: "PostgreSQL", version: "13.4" },
+  { name: "Node.js", version: "16.13.0" },
+  { name: "Oracle Database", version: "19c" },
+  { name: "IBM MQ", version: "9.2" },
+  { name: "Docker", version: "20.10.12" },
+  { name: "Kubernetes", version: "1.23.4" },
+];
+
+const VULN_TITLES = [
+  "Remote Code Execution in Authentication Module",
+  "SQL Injection in Search Functionality",
+  "Cross-Site Scripting in Message Rendering",
+  "Buffer Overflow in Transaction Parsing",
+  "Authentication Bypass via JWT Manipulation",
+  "Information Disclosure in Error Messages",
+  "Insecure Deserialization in Session Handling",
+  "Path Traversal in File Upload",
+  "SSRF in Report Generation Module",
+  "Template Injection in Email Rendering",
+  "Privilege Escalation via API Endpoint",
+  "Improper Access Control in Customer Data",
+  "XML External Entity Processing",
+  "Cryptographic Weakness in Key Exchange",
+  "Memory Leak in Connection Handler",
+  "Denial of Service via Malformed Request",
+  "Race Condition in Payment Processing",
+  "Insecure Random Number Generation",
+  "Hard-coded Credentials in Configuration",
+  "Missing Certificate Validation",
+];
+
+const DESCRIPTIONS = [
+  "A critical vulnerability exists in the authentication module that allows remote attackers to execute arbitrary code by exploiting improper input validation in the login request handler.",
+  "The search functionality is vulnerable to SQL injection attacks due to insufficient sanitization of user input parameters, potentially allowing unauthorized database access.",
+  "Cross-site scripting vulnerability in the message rendering component allows attackers to inject malicious scripts that execute in the context of authenticated users.",
+  "A buffer overflow vulnerability in the transaction parsing module can be exploited by sending specially crafted transaction data, potentially leading to remote code execution.",
+  "The JWT validation process can be bypassed by manipulating the algorithm header, allowing attackers to forge authentication tokens.",
+  "Error messages returned by the application disclose sensitive information about the internal system architecture and configuration.",
+  "The session handling mechanism is vulnerable to insecure deserialization attacks that can lead to remote code execution.",
+  "Path traversal vulnerability in the file upload functionality allows attackers to write files to arbitrary locations on the server.",
+  "Server-side request forgery vulnerability in the report generation module allows attackers to make requests to internal services.",
+  "Template injection vulnerability in the email rendering component allows attackers to execute arbitrary code on the server.",
+];
+
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+function randomElement<T>(array: T[]): T {
+  return array[Math.floor(Math.random() * array.length)];
+}
+
+function randomDate(daysAgo: number, daysAhead: number = 0): Date {
+  const now = new Date();
+  const offset = randomInt(-daysAgo, daysAhead);
+  return new Date(now.getTime() + offset * 24 * 60 * 60 * 1000);
+}
+
+function generateCVE(): string {
+  const year = Math.random() > 0.3 ? 2024 : 2025;
+  const id = randomInt(10000, 99999);
+  return `CVE-${year}-${id}`;
+}
+
+function generateHostName(app: string, env: OperatingEnvironment): string {
+  const prefix = app.toLowerCase().replace(/\s+/g, "-").substring(0, 8);
+  const envCode = env === "Production" ? "prd" : env === "Non-Production" ? "npd" : env === "Development" ? "dev" : "uat";
+  const num = String(randomInt(1, 999)).padStart(3, "0");
+  return `${prefix}-${envCode}-${num}.bank.internal`;
+}
+
+function generateIP(): string {
+  const subnets = ["10.1.100", "10.2.50", "172.16.20", "192.168.10"];
+  return `${randomElement(subnets)}.${randomInt(1, 254)}`;
+}
+
+function generateGisId(): string {
+  return `GIS-${new Date().getFullYear()}-${String(randomInt(1, 999999)).padStart(6, "0")}`;
+}
+
+function generateQualysId(): string {
+  return `QID-${randomInt(10000, 99999)}`;
+}
+
+function generateCrqNumber(): string {
+  return `CRQ${String(randomInt(1, 99999999)).padStart(12, "0")}`;
+}
+
+function weightedRandom<T>(options: { value: T; weight: number }[]): T {
+  const total = options.reduce((sum, opt) => sum + opt.weight, 0);
+  let random = Math.random() * total;
+  for (const option of options) {
+    random -= option.weight;
+    if (random <= 0) return option.value;
+  }
+  return options[options.length - 1].value;
+}
+
+function generateActivityLog(status: TriageStatus, disposition: Disposition): ActivityLogEntry[] {
+  const entries: ActivityLogEntry[] = [];
+  const now = new Date();
+  
+  entries.push({
+    id: crypto.randomUUID(),
+    odiserId: "system",
+    userName: "System",
+    action: "Vulnerability detected and imported from scan",
+    timestamp: new Date(now.getTime() - randomInt(5, 30) * 24 * 60 * 60 * 1000),
+  });
+
+  if (status !== "Awaiting Disposition" || Math.random() > 0.5) {
+    const user = randomElement(USERS);
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: "was assigned as vulnerability owner",
+      timestamp: new Date(now.getTime() - randomInt(3, 20) * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  if (status === "In Progress" || status === "Pending Clear Scan" || status === "Resolved") {
+    const user = randomElement(USERS);
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: "changed status",
+      field: "status",
+      oldValue: "Awaiting Disposition",
+      newValue: "In Progress",
+      timestamp: new Date(now.getTime() - randomInt(2, 15) * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  if (disposition) {
+    const user = randomElement(USERS);
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: `set disposition to "${disposition}"`,
+      field: "disposition",
+      newValue: disposition,
+      timestamp: new Date(now.getTime() - randomInt(1, 10) * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  if (status === "Pending Clear Scan" || status === "Resolved") {
+    const user = randomElement(USERS);
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: "changed status",
+      field: "status",
+      oldValue: "In Progress",
+      newValue: status === "Resolved" ? "Pending Clear Scan" : status,
+      timestamp: new Date(now.getTime() - randomInt(1, 5) * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  if (status === "Resolved") {
+    const user = randomElement(USERS);
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: "marked health check as complete",
+      timestamp: new Date(now.getTime() - randomInt(0, 3) * 24 * 60 * 60 * 1000),
+    });
+    entries.push({
+      id: crypto.randomUUID(),
+      odiserId: user.id,
+      userName: user.name,
+      action: "changed status",
+      field: "status",
+      oldValue: "Pending Clear Scan",
+      newValue: "Resolved",
+      timestamp: new Date(now.getTime() - randomInt(0, 2) * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  return entries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+}
+
+export function generateVulnerabilities(count: number = 50): Vulnerability[] {
+  const vulnerabilities: Vulnerability[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const status = weightedRandom<TriageStatus>([
+      { value: "Awaiting Disposition", weight: 30 },
+      { value: "In Progress", weight: 35 },
+      { value: "Pending Clear Scan", weight: 20 },
+      { value: "Resolved", weight: 15 },
+    ]);
+
+    const severity = weightedRandom<Severity>([
+      { value: "Critical", weight: 5 },
+      { value: "High", weight: 25 },
+      { value: "Medium", weight: 50 },
+      { value: "Low", weight: 20 },
+    ]);
+
+    const operatingEnvironment = weightedRandom<OperatingEnvironment>([
+      { value: "Production", weight: 60 },
+      { value: "Non-Production", weight: 25 },
+      { value: "Development", weight: 10 },
+      { value: "UAT", weight: 5 },
+    ]);
+
+    const source = weightedRandom<Source>([
+      { value: "Qualys", weight: 70 },
+      { value: "Tenable", weight: 15 },
+      { value: "Rapid7", weight: 10 },
+      { value: "Manual", weight: 5 },
+    ]);
+
+    const verificationStatus = weightedRandom<VerificationStatus>([
+      { value: "Verified", weight: 40 },
+      { value: "Pending Verification", weight: 35 },
+      { value: "Verification Failed", weight: 5 },
+      { value: "Not Required", weight: 20 },
+    ]);
+
+    let disposition: Disposition = null;
+    if (status !== "Awaiting Disposition") {
+      disposition = weightedRandom<Disposition>([
+        { value: "Fix", weight: 50 },
+        { value: "Mitigate", weight: 20 },
+        { value: "Defer", weight: 15 },
+        { value: "Accept Risk", weight: 10 },
+        { value: "False Positive", weight: 5 },
+      ]);
+    }
+
+    const app = randomElement(APPLICATIONS);
+    const tech = randomElement(TECHNOLOGIES);
+    const hostName = generateHostName(app, operatingEnvironment);
+    const daysOpen = weightedRandom([
+      { value: randomInt(1, 7), weight: 20 },
+      { value: randomInt(7, 14), weight: 25 },
+      { value: randomInt(14, 30), weight: 30 },
+      { value: randomInt(30, 60), weight: 15 },
+      { value: randomInt(60, 120), weight: 10 },
+    ]);
+
+    const dateObserved = new Date(Date.now() - daysOpen * 24 * 60 * 60 * 1000);
+    const dueDate = new Date(dateObserved.getTime() + randomInt(14, 45) * 24 * 60 * 60 * 1000);
+    const pastDue = dueDate < new Date();
+
+    const hasOwner = Math.random() > 0.2;
+    const owner = hasOwner ? randomElement(USERS) : null;
+
+    const hasCrq = disposition === "Fix" || disposition === "Mitigate" ? Math.random() > 0.3 : Math.random() > 0.7;
+
+    const identifiedBlockers: Blocker[] = [];
+    if (disposition === "Defer" || disposition === "Accept Risk") {
+      const blockerCount = randomInt(1, 3);
+      const allBlockers: Blocker[] = [
+        "Vendor / internal package availability",
+        "Testing and partner / peer team dependencies",
+        "Limited central (bulk) remediation capabilities",
+        "Third-party dependencies",
+        "Hardware dependencies",
+        "Application re-design / re-architecture required",
+        "Hosting Capacity",
+        "No patch available",
+        "False positives in Vulnerability and FOSS data",
+        "Data and reporting limitations",
+      ];
+      for (let b = 0; b < blockerCount; b++) {
+        const blocker = randomElement(allBlockers);
+        if (!identifiedBlockers.includes(blocker)) {
+          identifiedBlockers.push(blocker);
+        }
+      }
+    }
+
+    const vulnerability: Vulnerability = {
+      id: crypto.randomUUID(),
+      gisId: generateGisId(),
+      qualysId: generateQualysId(),
+      cve: generateCVE(),
+      title: randomElement(VULN_TITLES),
+      status,
+      statusDetails: status === "In Progress" ? "Remediation in progress" : undefined,
+      severity,
+      severityRisk: severity,
+      verificationStatus,
+      source,
+      disposition,
+      ctiRemediation: disposition ? Math.random() > 0.3 : null,
+      identifiedBlockers,
+      requestedPatchWindow: disposition === "Fix" || disposition === "Mitigate" 
+        ? randomElement(["Sat 5/9 00:00–08:00 ET", "Sat 5/9 08:00–16:00 ET", "Sun 5/10 00:00–08:00 ET", "Sat 5/16 00:00–08:00 ET"])
+        : undefined,
+      expectedRemediationDate: disposition === "Fix" || disposition === "Mitigate" || disposition === "Defer" ? randomDate(0, 30) : undefined,
+      crqNumber: hasCrq ? generateCrqNumber() : undefined,
+      remediationComplete: status === "Pending Clear Scan" || status === "Resolved" ? true : null,
+      healthCheckTime: status === "Resolved" ? randomDate(7, 0) : undefined,
+      healthCheckComplete: status === "Resolved" ? true : null,
+      hostName,
+      fqdn: `${hostName.replace(".bank.internal", "")}.payments.bank.internal`,
+      osName: randomElement(["Red Hat Enterprise Linux 8.6", "Windows Server 2019", "Ubuntu 20.04 LTS", "CentOS 7.9"]),
+      osVersion: randomElement(["8.6", "2019", "20.04", "7.9"]),
+      ipAddresses: [generateIP(), Math.random() > 0.5 ? generateIP() : ""].filter(Boolean),
+      operatingEnvironment,
+      hostingPlatform: randomElement(["AWS", "Azure", "On-Premise", "GCP", "Private Cloud"]),
+      isPublicInternetAccessible: Math.random() > 0.7,
+      isDmz: Math.random() > 0.8,
+      isOnSite: Math.random() > 0.4,
+      tier: randomElement(["Tier 1 Critical", "Tier 2 Important", "Tier 3 Standard"]),
+      securityZone: randomElement(["Internal", "DMZ", "External", "Restricted"]),
+      applicationFullName: app,
+      cioDisplayName: "Payments Technology",
+      techExecutive: randomElement(["John Smith", "Jane Doe", "Robert Johnson", "Patricia Williams"]),
+      techExecutiveContact: `${randomElement(["john.smith", "jane.doe", "robert.johnson"])}@bank.internal`,
+      vulnOwner: owner?.name,
+      vulnOwnerEmail: owner?.email,
+      runbookOwner: randomElement(["Platform Engineering", "Security Operations", "Infrastructure", "DevOps"]),
+      financialHierarchy: `Technology > ${app.split(" ")[0]} > Core Processing`,
+      remediationCoordinator: Math.random() > 0.5 ? randomElement(USERS).name : undefined,
+      description: randomElement(DESCRIPTIONS),
+      technicalDescription: "This vulnerability affects the core authentication mechanism and requires immediate attention.",
+      technicalDetail: "CVE details indicate that the vulnerability can be exploited remotely without authentication.",
+      vulnerabilityFindings: "Confirmed via automated scan and manual verification.",
+      vulnerabilitySubcategory: randomElement(["Injection", "Authentication", "Configuration", "Cryptography"]),
+      technology: tech.name,
+      technologyVersion: tech.version,
+      dateObserved,
+      dateLastSeen: randomDate(3, 0),
+      hostLastSeen: randomDate(1, 0),
+      daysOpen,
+      dueDate,
+      scheduledFixDate: disposition === "Fix" ? randomDate(0, 14) : undefined,
+      remediatedDate: status === "Resolved" ? randomDate(5, 0) : undefined,
+      nextRmw: randomDate(0, 7),
+      lastUpdated: randomDate(3, 0),
+      pastDue,
+      patchCategory: randomElement(["Security Update", "Hotfix", "Service Pack", "Cumulative Update"]),
+      patchTitle: `${tech.name} Security Update ${new Date().getFullYear()}-${randomInt(1, 12).toString().padStart(2, "0")}`,
+      vendorRiskLevel: randomElement(["Critical", "High", "Medium", "Low"]),
+      gisExternalFlag: Math.random() > 0.8,
+      erpScorecardStatus: Math.random() > 0.7 ? randomElement(["Active", "Pending", "Expired"]) : undefined,
+      erpCount: Math.random() > 0.7 ? randomInt(0, 5) : undefined,
+      esmType: randomElement(["Tier 1 Critical", "Tier 2 Important", "Tier 3 Standard"]),
+      isBuiltInHouse: Math.random() > 0.6,
+      workstream: randomElement(["Vulnerability Management", "Patch Management", "Risk Remediation"]),
+      activityLog: generateActivityLog(status, disposition),
+      lastSavedAt: Math.random() > 0.5 ? randomDate(7, 0) : undefined,
+      lastSavedBy: Math.random() > 0.5 ? randomElement(USERS).name : undefined,
+    };
+
+    vulnerabilities.push(vulnerability);
+  }
+
+  return vulnerabilities;
+}
+
+export function generateSparklineData(baseValue: number, days: number = 14): SparklineDataPoint[] {
+  const data: SparklineDataPoint[] = [];
+  const now = new Date();
+  
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+    const variation = Math.floor(baseValue * 0.3 * (Math.random() - 0.5));
+    data.push({
+      date: date.toISOString().split("T")[0],
+      value: Math.max(0, baseValue + variation),
+    });
+  }
+  
+  return data;
+}
+
+export function generateSeverityStatusData(vulnerabilities: Vulnerability[]): SeverityStatusData[] {
+  const severities: Severity[] = ["Critical", "High", "Medium", "Low"];
+  
+  return severities.map((severity) => {
+    const filtered = vulnerabilities.filter((v) => v.severity === severity);
+    return {
+      severity,
+      awaitingDisposition: filtered.filter((v) => v.status === "Awaiting Disposition").length,
+      inProgress: filtered.filter((v) => v.status === "In Progress").length,
+      pendingClearScan: filtered.filter((v) => v.status === "Pending Clear Scan").length,
+      resolved: filtered.filter((v) => v.status === "Resolved").length,
+    };
+  });
+}
+
+export const mockVulnerabilities = generateVulnerabilities(50);

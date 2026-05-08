@@ -95,6 +95,21 @@ importers:
       '@vercel/analytics':
         specifier: 1.6.1
         version: 1.6.1(next@16.2.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
+      ag-charts-enterprise:
+        specifier: ^10.0.0
+        version: 10.3.9
+      ag-charts-react:
+        specifier: ^10.0.0
+        version: 10.3.9(ag-charts-community@10.3.9)(react@19.2.4)
+      ag-grid-community:
+        specifier: ^32.3.0
+        version: 32.3.9
+      ag-grid-enterprise:
+        specifier: ^32.3.0
+        version: 32.3.9
+      ag-grid-react:
+        specifier: ^32.3.0
+        version: 32.3.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.24(postcss@8.5.6)
@@ -1255,6 +1270,36 @@ packages:
         optional: true
       vue-router:
         optional: true
+
+  ag-charts-community@10.3.9:
+    resolution: {integrity: sha512-9rZneZr1xwX2yjoD+9+WJjNd0WF/FD1ODpNqOR79bqMWu1T9fTu24N51ZIMPDdGHQWEPzdpva7f+K2xmHY5ntA==}
+
+  ag-charts-enterprise@10.3.9:
+    resolution: {integrity: sha512-vbFK73c5W6ZYi8BF8PYpdFovR0S19eAVW3W1tckRU68Y0QuRLDG5TUd4omXlNBWim3BT6+z2gkcT+iewCUHffA==}
+
+  ag-charts-locale@10.3.9:
+    resolution: {integrity: sha512-Wq0VNFFwE9+mErmeRue1vGTtuTmM0gH6PXbCnZNORv31J6smXF+uqmZ+98cZ7kXZQ27+HiVElh8HakQsBg70bA==}
+
+  ag-charts-react@10.3.9:
+    resolution: {integrity: sha512-SoMr8k+w/hpNR8i0M6xXQfUYAz4UcwrKPEAC9zphA/ZIoUfTEl/8TEcfRfEG0trwJYr2J/JwaEpdLcm8t4VJHw==}
+    peerDependencies:
+      ag-charts-community: 10.3.9
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  ag-charts-types@10.3.9:
+    resolution: {integrity: sha512-drcRiJVencliC8LnRwk4MmeQDNNBg5GzmOoLFihO3/k0CUK0VF/N+2nc7iFozwaNG0btSB9vAhYuJLjqHMtRrQ==}
+
+  ag-grid-community@32.3.9:
+    resolution: {integrity: sha512-l07SB0mCbGPkC1R8rQQFgBtI5+1FoXBi3RUk1+dHKV/UPeorMEFAzCokcsOhz0qwcWCPrHauUsbRa1SIxfVEJQ==}
+
+  ag-grid-enterprise@32.3.9:
+    resolution: {integrity: sha512-saYGKFk+XakHQqaVbthM8Ax64M9m0G9B3gwRghqekQYKd5e3KWpyp/ve8YTzufyBk5SvrNgG9REX52w6ldMfJg==}
+
+  ag-grid-react@32.3.9:
+    resolution: {integrity: sha512-moC64CHbTOf+OSG2xCHYJdWh3MtYaVNvi5n7ro+ImS5gSFn7c5a42pjcfTmDh2sPsKD7qmBXXQ5Vr+Zwg9DhNA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   aria-hidden@1.2.6:
     resolution: {integrity: sha512-ik3ZgC9dY/lYVVM++OISsaYDeg1tb0VtP5uL3ouh1koGOaUMDPpbFIei4JkFimWUFPn90sbMNMXQAIVOlnYKJA==}
@@ -2738,6 +2783,40 @@ snapshots:
     optionalDependencies:
       next: 16.2.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
+
+  ag-charts-community@10.3.9:
+    dependencies:
+      ag-charts-locale: 10.3.9
+      ag-charts-types: 10.3.9
+
+  ag-charts-enterprise@10.3.9:
+    dependencies:
+      ag-charts-community: 10.3.9
+
+  ag-charts-locale@10.3.9: {}
+
+  ag-charts-react@10.3.9(ag-charts-community@10.3.9)(react@19.2.4):
+    dependencies:
+      ag-charts-community: 10.3.9
+      react: 19.2.4
+
+  ag-charts-types@10.3.9: {}
+
+  ag-grid-community@32.3.9:
+    dependencies:
+      ag-charts-types: 10.3.9
+
+  ag-grid-enterprise@32.3.9:
+    dependencies:
+      ag-charts-community: 10.3.9
+      ag-grid-community: 32.3.9
+
+  ag-grid-react@32.3.9(react-dom@19.2.4(react@19.2.4))(react@19.2.4):
+    dependencies:
+      ag-grid-community: 32.3.9
+      prop-types: 15.8.1
+      react: 19.2.4
+      react-dom: 19.2.4(react@19.2.4)
 
   aria-hidden@1.2.6:
     dependencies:
