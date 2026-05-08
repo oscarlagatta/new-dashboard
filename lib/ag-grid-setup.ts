@@ -11,11 +11,11 @@
  * Pagination will be handled server-side.
  */
 
-import { LicenseManager, ModuleRegistry, AllEnterpriseModule } from "ag-grid-enterprise";
+import { LicenseManager } from "ag-grid-enterprise";
 import { AgCharts } from "ag-charts-enterprise";
 
-// Register AG Grid Enterprise modules
-ModuleRegistry.registerModules([AllEnterpriseModule]);
+// Import and register all enterprise features
+import "ag-grid-enterprise";
 
 // Set AG Grid license key (replace with env variable in production)
 const AG_GRID_LICENSE_KEY = process.env.NEXT_PUBLIC_AG_GRID_LICENSE_KEY || "YOUR_AG_GRID_LICENSE_KEY";
