@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { AgGridReact } from "ag-grid-react";
+import "ag-grid-community/styles/ag-grid.css";
+import "ag-grid-community/styles/ag-theme-quartz.css";
 import type { ColDef, GridApi, GridReadyEvent, RowClickedEvent } from "ag-grid-community";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -319,13 +321,13 @@ export function AgGridVulnerabilityTable() {
                   checkboxes: true,
                   headerCheckbox: true,
                   enableClickSelection: false,
+                  copySelectedRows: false,
                 }}
                 pagination={true}
                 paginationPageSize={50}
                 paginationPageSizeSelector={[25, 50, 100, 200]}
                 animateRows={true}
                 enableCellTextSelection={true}
-                suppressCopyRowsToClipboard={true}
                 rowHeight={42}
                 headerHeight={40}
                 floatingFiltersHeight={38}

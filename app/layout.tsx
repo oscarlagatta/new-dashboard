@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { ResizeObserverFix } from '@/components/resize-observer-fix'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-sans-inter" });
@@ -37,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
+        <ResizeObserverFix />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
