@@ -17,7 +17,7 @@ import { SlaStrip } from "@/components/executive/sla-strip";
 import { SeverityAgeHeatmap } from "@/components/executive/severity-age-heatmap";
 import { BurndownChart } from "@/components/executive/burndown-chart";
 import { TopExposures } from "@/components/executive/top-exposures";
-import { AllVulnerabilitiesTable } from "@/components/executive/all-vulnerabilities-table";
+import { AgGridVulnerabilityTable } from "@/components/executive/ag-grid-table";
 import { SCOPES, RISK_POSTURE } from "@/lib/executive-data";
 
 export default function ExecutiveDashboard() {
@@ -31,9 +31,9 @@ export default function ExecutiveDashboard() {
 
   return (
     <main className="min-h-screen bg-muted/30">
-      {/* Header */}
+      {/* Header - Full width */}
       <header className="bg-background border-b border-border/60">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center h-9 w-9 rounded-md bg-zinc-900 text-white">
               <ShieldCheck className="h-5 w-5" />
@@ -90,7 +90,7 @@ export default function ExecutiveDashboard() {
         </div>
       </header>
 
-      {/* Body */}
+      {/* Executive Summary Section - Constrained width for readability */}
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* 1. Risk posture hero */}
         <RiskPostureHero />
@@ -110,13 +110,15 @@ export default function ExecutiveDashboard() {
 
         {/* 4. Top critical exposures */}
         <TopExposures />
+      </div>
 
-        {/* 5. Collapsed table */}
-        <AllVulnerabilitiesTable />
+      {/* AG Grid Section - Full width for enterprise data density */}
+      <div className="px-6 pb-6">
+        <AgGridVulnerabilityTable />
 
-        <div className="text-[11px] text-muted-foreground pt-2 pb-6 text-center">
+        <div className="text-[11px] text-muted-foreground pt-4 pb-2 text-center">
           Data refreshed every 15 minutes from Qualys, BMC Remedy, and the asset
-          inventory of record. For triage detail and bulk actions, switch to the analyst view.
+          inventory of record. Click any row to view details and triage.
         </div>
       </div>
     </main>
