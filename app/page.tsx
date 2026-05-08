@@ -74,7 +74,7 @@ import {
   LastUpdatedCellRenderer,
 } from "@/components/ag-grid/cell-renderers";
 import { StatCards } from "@/components/vulnerability/stat-cards";
-import { SeverityStatusChart } from "@/components/vulnerability/severity-status-chart";
+import { ChartsPanel } from "@/components/vulnerability/charts-panel";
 import { DetailSheet } from "@/components/vulnerability/detail-sheet";
 import {
   mockVulnerabilities,
@@ -639,7 +639,7 @@ export default function VulnerabilityDashboard() {
       {/* Stats & Chart */}
       <div className="px-6 py-4 space-y-4 shrink-0 border-b">
         <StatCards counts={stats} />
-        <SeverityStatusChart data={chartData} />
+        <ChartsPanel severityStatusData={chartData} vulnerabilities={rowData} />
       </div>
 
       {/* Toolbar */}
