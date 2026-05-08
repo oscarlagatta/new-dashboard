@@ -134,18 +134,6 @@ export default function VulnerabilityDashboard() {
   const columnDefs = useMemo<ColDef[]>(
     () => [
       {
-        headerName: "",
-        field: "id",
-        width: 50,
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        pinned: "left",
-        lockPosition: true,
-        suppressHeaderMenuButton: true,
-        sortable: false,
-        filter: false,
-      },
-      {
         headerName: "Status",
         field: "status",
         width: 170,
@@ -580,7 +568,9 @@ export default function VulnerabilityDashboard() {
 
     gridApi.addEventListener("filterChanged", updateFilters);
     return () => {
-      gridApi.removeEventListener("filterChanged", updateFilters);
+      if (!gridApi.isDestroyed()) {
+        gridApi.removeEventListener("filterChanged", updateFilters);
+      }
     };
   }, [gridApi]);
 
@@ -647,13 +637,13 @@ export default function VulnerabilityDashboard() {
       </header>
 
       {/* Stats & Chart */}
-      <div className="px-6 py-4 space-y-4 shrink-0">
+      <div className="px-6 py-4 space-y-4 shrink-0 border-b">
         <StatCards counts={stats} />
         <SeverityStatusChart data={chartData} />
       </div>
 
       {/* Toolbar */}
-      <div className="px-6 py-3 border-b shrink-0 space-y-3">
+      <div className="px-6 py-3 shrink-0 space-y-3">
         <div className="flex items-center gap-4">
           {/* Quick Filter */}
           <div className="relative flex-1 max-w-md">
@@ -738,10 +728,13 @@ export default function VulnerabilityDashboard() {
             onGridReady={onGridReady}
             onRowClicked={onRowClicked}
             onSelectionChanged={onSelectionChanged}
-            rowSelection="multiple"
-            suppressRowClickSelection={true}
-            rowMultiSelectWithClick={false}
-            enableRangeSelection={true}
+            rowSelection={{
+              mode: "multiRow",
+              checkboxes: true,
+              headerCheckbox: true,
+              enableClickSelection: false,
+              enableSelectionWithoutKeys: false,
+            }}
             enableCharts={true}
             cellSelection={true}
             pagination={true}
