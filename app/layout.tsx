@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _inter = Inter({ subsets: ["latin"], variable: "--font-sans-inter" });
+const _jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb" });
 
 export const metadata: Metadata = {
-  title: 'Vulnerability Triage Dashboard',
-  description: 'Internal enterprise tool for triaging and remediating security vulnerabilities',
+  title: 'Vulnerability Remediation — Executive Dashboard',
+  description: 'CIO-level vulnerability remediation posture and SLA tracking',
   generator: 'v0.app',
   icons: {
     icon: [
