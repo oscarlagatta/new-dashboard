@@ -190,3 +190,101 @@ export const SCOPES = [
   "CIO: Capital Markets",
   "CIO: Corporate Banking",
 ];
+
+// Remediation trend — 12 weeks of opened vs closed (realistic scale)
+export interface TrendWeek {
+  week: string;
+  opened: number;
+  closed: number;
+}
+
+export const REMEDIATION_TREND: TrendWeek[] = [
+  { week: "Feb 9",  opened: 52400, closed: 38200 },
+  { week: "Feb 16", opened: 54800, closed: 41500 },
+  { week: "Feb 23", opened: 48200, closed: 39800 },
+  { week: "Mar 2",  opened: 51600, closed: 43200 },
+  { week: "Mar 9",  opened: 47800, closed: 45600 },
+  { week: "Mar 16", opened: 45200, closed: 48100 },
+  { week: "Mar 23", opened: 49400, closed: 51800 },
+  { week: "Mar 30", opened: 43600, closed: 53200 },
+  { week: "Apr 6",  opened: 41200, closed: 52400 },
+  { week: "Apr 13", opened: 44800, closed: 55700 },
+  { week: "Apr 20", opened: 38600, closed: 57200 },
+  { week: "Apr 27", opened: 36800, closed: 59400 },
+];
+
+// Vulnerabilities by source and priority (pre-aggregated at scale)
+export interface SourceChartRow {
+  source: string;
+  priority1: number;
+  priority2: number;
+  priority3: number;
+  priority4: number;
+}
+
+export const SOURCE_CHART_OPEN: SourceChartRow[] = [
+  { source: "MWPatch", priority1:  1750, priority2:  28000, priority3: 192500, priority4: 127750 },
+  { source: "ADSF",    priority1:  1400, priority2:  22400, priority3: 154000, priority4: 102200 },
+  { source: "BDNA",    priority1:  1100, priority2:  17600, priority3: 121000, priority4:  80300 },
+  { source: "Blade",   priority1:  1050, priority2:  16800, priority3: 115500, priority4:  76650 },
+  { source: "ESM",     priority1:   950, priority2:  15200, priority3: 104500, priority4:  69350 },
+  { source: "Cloud",   priority1:   725, priority2:  11600, priority3:  79750, priority4:  52925 },
+  { source: "BMP",     priority1:   325, priority2:   5200, priority3:  35750, priority4:  23725 },
+  { source: "CTI",     priority1:   200, priority2:   3200, priority3:  22000, priority4:  14600 },
+];
+
+export const SOURCE_CHART_ALL: SourceChartRow[] = [
+  { source: "MWPatch", priority1:  3200, priority2:  51000, priority3: 365000, priority4: 243000 },
+  { source: "ADSF",    priority1:  2600, priority2:  41000, priority3: 291000, priority4: 193000 },
+  { source: "BDNA",    priority1:  2000, priority2:  32000, priority3: 228000, priority4: 151000 },
+  { source: "Blade",   priority1:  1900, priority2:  30000, priority3: 218000, priority4: 144000 },
+  { source: "ESM",     priority1:  1700, priority2:  27000, priority3: 197000, priority4: 130000 },
+  { source: "Cloud",   priority1:  1300, priority2:  21000, priority3: 150000, priority4:  99000 },
+  { source: "BMP",     priority1:   600, priority2:   9500, priority3:  67000, priority4:  44500 },
+  { source: "CTI",     priority1:   400, priority2:   6000, priority3:  41000, priority4:  27000 },
+];
+
+// Days open distribution (pre-aggregated open vulnerabilities)
+export interface DaysOpenData {
+  under30:  number;
+  d30to90:  number;
+  d90to365: number;
+  over365:  number;
+}
+
+export const DAYS_OPEN_DATA: DaysOpenData = {
+  under30:  285000,
+  d30to90:  523000,
+  d90to365: 480000,
+  over365:  212000,
+};
+
+// SLA compliance by priority
+export interface SlaComplianceRow {
+  priority: string;
+  slaDays: number;
+  compliance: number;
+  target: number;
+  color: string;
+}
+
+export const SLA_COMPLIANCE_BY_PRIORITY: SlaComplianceRow[] = [
+  { priority: "Priority 1", slaDays: 7,  compliance: 88, target: 95, color: "#EF4444" },
+  { priority: "Priority 2", slaDays: 14, compliance: 92, target: 95, color: "#F97316" },
+  { priority: "Priority 3", slaDays: 30, compliance: 96, target: 95, color: "#FBBF24" },
+  { priority: "Priority 4", slaDays: 90, compliance: 98, target: 95, color: "#60A5FA" },
+];
+
+export const SLA_OVERALL_COMPLIANCE = 93;
+
+// Aggregated KPI counts — in production these come from a server-side aggregation
+// API, not from counting paginated rows. The AG Grid table is a separate request.
+export const DASHBOARD_STATS = {
+  total:        2_847_291,
+  awaiting:       124_583,
+  inProgress:     312_847,
+  pendingClear:   198_412,
+  resolved:       563_204,
+  priority1:        8_423,
+  overdue:        134_892,
+};

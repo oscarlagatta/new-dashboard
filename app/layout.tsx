@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
-import { Inter, JetBrains_Mono } from 'next/font/google'
+import { Inter, JetBrains_Mono, DM_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ResizeObserverFix } from '@/components/resize-observer-fix'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-sans-inter" });
 const _jetbrains = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb" });
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans", weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: 'Vulnerability Remediation — Executive Dashboard',
@@ -37,9 +38,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body className={`${dmSans.variable} font-sans antialiased`}>
         <ResizeObserverFix />
-        {children}
+        <div
+          className="src-dashboard"
+          style={{ backgroundColor: "#F7F8FA", color: "#111827", minHeight: "100dvh" }}
+        >
+          {children}
+        </div>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
