@@ -1054,6 +1054,8 @@ export function AgGridTriageTable({
           open={sheetOpen}
           onOpenChange={onSheetChange}
           onSave={onSave}
+          allVulnerabilities={vulnerabilities}
+          onNavigate={onRowSelected}
         />
       )}
 

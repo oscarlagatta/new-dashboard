@@ -55,20 +55,26 @@ const P_COLORS = {
 
 interface SourceBarChartProps {
   data: SourceChartRow[];
+  /** Optional X-axis tick formatter for long labels (e.g. application/owner names). */
+  tickFormatter?: (value: string) => string;
+  /** Per-bar size — narrower bars when more categories are shown. */
+  barSize?: number;
 }
 
-export function SourceBarChart({ data }: SourceBarChartProps) {
+export function SourceBarChart({ data, tickFormatter, barSize = 28 }: SourceBarChartProps) {
   const chartData = data;
 
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={chartData} barSize={28} barGap={4} barCategoryGap="25%">
+      <BarChart data={chartData} barSize={barSize} barGap={4} barCategoryGap="25%">
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
         <XAxis
           dataKey="source"
           tick={{ fontSize: 11, fill: "#9CA3AF" }}
           axisLine={false}
           tickLine={false}
+          interval={0}
+          tickFormatter={tickFormatter}
         />
         <YAxis
           tick={{ fontSize: 11, fill: "#9CA3AF" }}
