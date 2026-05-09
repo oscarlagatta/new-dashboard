@@ -32,10 +32,20 @@ import {
 } from "@/components/ui/popover";
 import { AgGridTriageTable } from "@/components/executive/ag-grid-table";
 import { SourceBarChart, DaysOpenChart, RemediationTrendChart, SlaComplianceChart } from "@/components/dashboard/charts";
+import { BlockersStrip } from "@/components/dashboard/blockers-strip";
 import { mockVulnerabilities, CIO_TEAMS } from "@/lib/mock-data";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
-import { DASHBOARD_STATS, SOURCE_CHART_OPEN, SOURCE_CHART_ALL, DAYS_OPEN_DATA } from "@/lib/executive-data";
+import {
+  DASHBOARD_STATS,
+  SOURCE_CHART_OPEN,
+  SOURCE_CHART_ALL,
+  APPLICATION_CHART_OPEN,
+  APPLICATION_CHART_ALL,
+  OWNER_CHART_OPEN,
+  OWNER_CHART_ALL,
+  DAYS_OPEN_DATA,
+} from "@/lib/executive-data";
 
 // ── Animations ─────────────────────────────────────────────────────────────────
 
@@ -351,14 +361,14 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         flexShrink: 0,
       }}
     >
-      {/* Left: title + badge row */}
+      {/* Left: title (recessed) + meta-row (promoted) */}
       <div style={{ minWidth: 0 }}>
         <h1
           style={{
-            fontSize: 44,
-            fontWeight: 800,
+            fontSize: 24,
+            fontWeight: 600,
             color: "#111827",
-            lineHeight: 1.1,
+            lineHeight: 1.2,
             margin: 0,
             whiteSpace: "nowrap",
           }}
@@ -367,40 +377,23 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         </h1>
         <p
           style={{
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 400,
-            color: "#6B7280",
-            margin: "6px 0 8px",
-            lineHeight: 1.5,
+            color: "#9CA3AF",
+            margin: "2px 0 10px",
+            lineHeight: 1.4,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
-          Real-time visibility into open vulnerabilities, remediation progress, and SLA compliance across all teams.
+          Real-time vulnerability remediation across all teams.
         </p>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <InlineIconBadge
-            Icon={ShieldAlert}
-            text={`${formatCount(stats.total)} vulnerabilities`}
-            onClick={() => onNavigate("vulnerabilities")}
-          />
-          <InlineIconBadge
-            Icon={Clock}
-            text={`${formatCount(stats.overdue)} overdue`}
-            onClick={() => onNavigate("vulnerabilities")}
-          />
-          <InlineIconBadge
-            Icon={AlertTriangle}
-            text={`${formatCount(stats.priority1)} Priority 1`}
-            onClick={() => onNavigate("vulnerabilities")}
-          />
-          <InlineIconBadge Icon={Building2} text={department} />
-        </div>
+        <MetaRow
+          stats={stats}
+          department={department}
+          onNavigate={onNavigate}
+        />
       </div>
 
       {/* Right: search + bell + CIO */}
@@ -571,13 +564,74 @@ function Avatar({
   );
 }
 
-function InlineIconBadge({
-  Icon,
-  text,
+/**
+ * Promoted page-header meta-row. Reads as the page's primary scope context
+ * rather than chrome — overdue and priority-1 counts get a red number accent
+ * because those are what the CIO scans for first.
+ */
+function MetaRow({
+  stats,
+  department,
+  onNavigate,
+}: {
+  stats: HeaderStats;
+  department: string;
+  onNavigate: (page: Page) => void;
+}) {
+  const dotStyle: React.CSSProperties = {
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    background: "#9CA3AF",
+    flexShrink: 0,
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+        flexWrap: "wrap",
+        fontSize: 14,
+        fontWeight: 500,
+        color: "#374151",
+      }}
+    >
+      <MetaItem
+        value={formatCount(stats.total)}
+        label="vulnerabilities"
+        onClick={() => onNavigate("vulnerabilities")}
+      />
+      <span style={dotStyle} aria-hidden="true" />
+      <MetaItem
+        value={formatCount(stats.overdue)}
+        label="overdue"
+        valueColor="#DC2626"
+        onClick={() => onNavigate("vulnerabilities")}
+      />
+      <span style={dotStyle} aria-hidden="true" />
+      <MetaItem
+        value={formatCount(stats.priority1)}
+        label="Priority 1"
+        valueColor="#DC2626"
+        onClick={() => onNavigate("vulnerabilities")}
+      />
+      <span style={dotStyle} aria-hidden="true" />
+      <span style={{ color: "#6B7280" }}>{department}</span>
+    </div>
+  );
+}
+
+function MetaItem({
+  value,
+  label,
+  valueColor,
   onClick,
 }: {
-  Icon: React.ComponentType<{ style?: React.CSSProperties }>;
-  text: string;
+  value: string;
+  label: string;
+  valueColor?: string;
   onClick?: () => void;
 }) {
   return (
@@ -585,16 +639,26 @@ function InlineIconBadge({
       onClick={onClick}
       style={{
         display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
+        alignItems: "baseline",
+        gap: 5,
         background: "none",
         border: "none",
         padding: 0,
         cursor: onClick ? "pointer" : "default",
+        font: "inherit",
+        color: "inherit",
       }}
     >
-      <Icon style={{ width: 13, height: 13, color: "#9CA3AF" }} aria-hidden="true" />
-      <span style={{ fontSize: 12, fontWeight: 500, color: "#6B7280" }}>{text}</span>
+      <span
+        style={{
+          fontWeight: 700,
+          color: valueColor ?? "#111827",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {value}
+      </span>
+      <span style={{ fontWeight: 400, color: "#6B7280" }}>{label}</span>
     </button>
   );
 }
@@ -604,12 +668,8 @@ function InlineIconBadge({
 interface StatCardProps {
   label: string;
   count: number;
-  iconBg: string;
   Icon: React.ComponentType<{ style?: React.CSSProperties }>;
-  iconColor: string;
   accentColor: string;
-  countColor: string;
-  gradient: string;
   trend: number;
   trendLabel: string;
   trendBad: boolean;
@@ -618,15 +678,16 @@ interface StatCardProps {
   triageStatus?: TriageStatus;
 }
 
+/**
+ * Operational stat card — flat neutral background with a left-edge color accent.
+ * Whole card is the click target when a triageStatus is set; arrow icon top-right
+ * signals the affordance.
+ */
 function StatCard({
   label,
   count,
-  iconBg,
   Icon,
-  iconColor,
   accentColor,
-  countColor,
-  gradient,
   trend,
   trendLabel,
   trendBad,
@@ -635,150 +696,148 @@ function StatCard({
   triageStatus,
 }: StatCardProps) {
   const [hovered, setHovered] = useState(false);
-  const [arrowHovered, setArrowHovered] = useState(false);
   const TrendIcon = trend >= 0 ? ArrowUp : ArrowDown;
-  const trendColor = trendBad ? "#EF4444" : "#22C55E";
+  const trendColor = trendBad ? "#DC2626" : "#16A34A";
+  const trendBg = trendBad ? "#FEF2F2" : "#F0FDF4";
+  const clickable = !!triageStatus;
 
   return (
     <div
-      style={{
-        background: gradient,
-        borderRadius: CARD_RADIUS,
-        border: "none",
-        boxShadow: hovered
-          ? "0 6px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.04)"
-          : CARD_SHADOW,
-        padding: "14px 20px 0",
-        flex: 1,
-        minWidth: 0,
-        minHeight: 190,
-        position: "relative",
-        overflow: "hidden",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
-        transition: "transform 150ms ease, box-shadow 150ms ease",
-        animation: "fadeSlideUp 300ms ease forwards",
-        animationDelay: `${animDelay}ms`,
-        opacity: 0,
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? `View ${label}` : undefined}
+      onClick={() => clickable && onNavigate("vulnerabilities")}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onNavigate("vulnerabilities");
+        }
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      style={{
+        background: "#FFFFFF",
+        borderRadius: CARD_RADIUS,
+        border: "1px solid #E5E7EB",
+        boxShadow: hovered
+          ? "0 6px 20px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04)"
+          : CARD_SHADOW,
+        padding: "20px 22px 18px 22px",
+        flex: 1,
+        minWidth: 0,
+        minHeight: 158,
+        position: "relative",
+        overflow: "hidden",
+        transform: hovered ? "translateY(-1px)" : "translateY(0)",
+        transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+        borderColor: hovered && clickable ? "#D1D5DB" : "#E5E7EB",
+        animation: "fadeSlideUp 300ms ease forwards",
+        animationDelay: `${animDelay}ms`,
+        opacity: 0,
+        cursor: clickable ? "pointer" : "default",
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
-      {/* Top row: icon + arrow button */}
+      {/* Left accent strip */}
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 3,
+          background: accentColor,
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Top row: small leading icon + label, arrow top-right */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 48,
+          marginBottom: 14,
+          gap: 8,
         }}
       >
         <div
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 10,
-            background: iconBg,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
+            gap: 7,
+            minWidth: 0,
           }}
-          aria-hidden="true"
         >
-          <Icon style={{ width: 24, height: 24, color: iconColor }} />
+          <Icon
+            style={{ width: 14, height: 14, color: "#6B7280", flexShrink: 0 }}
+            aria-hidden="true"
+          />
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#374151",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {label}
+          </span>
         </div>
-        <button
-          onClick={() => triageStatus && onNavigate("vulnerabilities")}
-          onMouseEnter={() => setArrowHovered(true)}
-          onMouseLeave={() => setArrowHovered(false)}
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: "50%",
-            border: `1.5px solid ${arrowHovered ? "#2563EB" : "#E5E7EB"}`,
-            background: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: triageStatus ? "pointer" : "default",
-            padding: 0,
-            transition: "border-color 150ms",
-          }}
-          aria-label={`View ${label}`}
-        >
+        {clickable && (
           <ArrowUpRight
             style={{
-              width: 22,
-              height: 22,
-              color: arrowHovered ? "#2563EB" : "#9CA3AF",
+              width: 16,
+              height: 16,
+              color: hovered ? "#374151" : "#9CA3AF",
+              flexShrink: 0,
               transition: "color 150ms",
             }}
             aria-hidden="true"
           />
-        </button>
+        )}
       </div>
 
       {/* Count */}
       <p
         style={{
-          fontSize: 56,
-          fontWeight: 800,
+          fontSize: 44,
+          fontWeight: 700,
           color: "#111827",
           lineHeight: 1,
           fontVariantNumeric: "tabular-nums",
-          margin: 0,
+          margin: "0 0 12px",
         }}
         aria-label={`${count} ${label}`}
       >
         {formatCount(count)}
       </p>
 
-      {/* Trend */}
+      {/* Trend pill — color reflects whether the change is good or bad */}
       <div
         style={{
-          display: "flex",
+          display: "inline-flex",
+          alignSelf: "flex-start",
           alignItems: "center",
           gap: 4,
-          marginTop: 4,
+          padding: "3px 8px",
+          borderRadius: 999,
+          background: trendBg,
+          marginTop: "auto",
         }}
         aria-label={trendLabel}
       >
         <TrendIcon
-          style={{ width: 12, height: 12, color: trendColor, flexShrink: 0 }}
+          style={{ width: 11, height: 11, color: trendColor, flexShrink: 0 }}
           aria-hidden="true"
         />
-        <span style={{ fontSize: 12, fontWeight: 500, color: trendColor }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: trendColor }}>
           {trendLabel}
         </span>
       </div>
-
-      {/* Label */}
-      <p
-        style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: "#374151",
-          margin: "2px 0 10px",
-        }}
-      >
-        {label}
-      </p>
-
-      {/* Accent bar — no border-radius; card overflow:hidden clips it */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 5,
-          background: accentColor,
-          transformOrigin: "left",
-          animation: "accentBarGrow 400ms ease forwards",
-          animationDelay: `${animDelay + 280}ms`,
-          transform: "scaleX(0)",
-        }}
-        aria-hidden="true"
-      />
     </div>
   );
 }
@@ -801,8 +860,23 @@ interface DashboardPageProps {
   vulnerabilities: Vulnerability[];
 }
 
+type Dimension = "application" | "source" | "owner";
+
+const DIMENSION_TITLES: Record<Dimension, string> = {
+  application: "Vulnerabilities by Application",
+  source: "Vulnerabilities by Source",
+  owner: "Vulnerabilities by Owner",
+};
+
+/** Truncate long labels (app names, full owner names) for the X-axis. */
+function shortDimensionLabel(value: string): string {
+  if (value.length <= 14) return value;
+  return value.slice(0, 13) + "…";
+}
+
 function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProps) {
   const [chartFilter, setChartFilter] = useState<"open" | "all">("open");
+  const [dimension, setDimension] = useState<Dimension>("application");
 
   const openClosed = useMemo(() => {
     const open = SOURCE_CHART_OPEN.reduce(
@@ -811,16 +885,24 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
     return { open, closed: DASHBOARD_STATS.total - open };
   }, []);
 
+  const chartData = useMemo(() => {
+    // Summary numbers (1.5M Open / 1.3M Closed) intentionally remain overall —
+    // not dimension-scoped. The dimension toggle only swaps the breakdown axis.
+    if (dimension === "application") {
+      return chartFilter === "open" ? APPLICATION_CHART_OPEN : APPLICATION_CHART_ALL;
+    }
+    if (dimension === "owner") {
+      return chartFilter === "open" ? OWNER_CHART_OPEN : OWNER_CHART_ALL;
+    }
+    return chartFilter === "open" ? SOURCE_CHART_OPEN : SOURCE_CHART_ALL;
+  }, [dimension, chartFilter]);
+
   const STAT_CARDS: Omit<StatCardProps, "onNavigate">[] = [
     {
       label: "Awaiting Disposition",
       count: stats.awaiting,
-      iconBg: "#FEF2F2",
       Icon: AlertCircle,
-      iconColor: "#EF4444",
       accentColor: "#EF4444",
-      countColor: "#EF4444",
-      gradient: "linear-gradient(135deg, #FEE2E2 0%, #FECACA 60%, #FCA5A5 100%)",
       trend: 2,
       trendLabel: "2 more than last week",
       trendBad: true,
@@ -830,12 +912,8 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
     {
       label: "In Progress",
       count: stats.inProgress,
-      iconBg: "#FFFBEB",
       Icon: Clock,
-      iconColor: "#F59E0B",
       accentColor: "#F59E0B",
-      countColor: "#F59E0B",
-      gradient: "linear-gradient(135deg, #FEF3C7 0%, #FDE68A 60%, #FCD34D 100%)",
       trend: -1,
       trendLabel: "1 fewer than last week",
       trendBad: false,
@@ -845,12 +923,8 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
     {
       label: "Pending Clear Scan",
       count: stats.pendingClear,
-      iconBg: "#FFF7ED",
       Icon: ScanSearch,
-      iconColor: "#F97316",
-      accentColor: "#F97316",
-      countColor: "#F97316",
-      gradient: "linear-gradient(135deg, #FFEDD5 0%, #FED7AA 60%, #FDBA74 100%)",
+      accentColor: "#3B82F6",
       trend: 1,
       trendLabel: "1 more than last week",
       trendBad: true,
@@ -860,12 +934,8 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
     {
       label: "Resolved (last 30 days)",
       count: stats.resolved,
-      iconBg: "#F0FDF4",
       Icon: CheckCircle2,
-      iconColor: "#22C55E",
       accentColor: "#22C55E",
-      countColor: "#22C55E",
-      gradient: "linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 60%, #86EFAC 100%)",
       trend: -3,
       trendLabel: "3 fewer than last week",
       trendBad: true,
@@ -893,6 +963,11 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
         ))}
       </section>
 
+      {/* Blockers rollup — turns triage decisions into org-level visibility */}
+      <section style={{ marginBottom: 20 }} aria-label="Remediation blockers">
+        <BlockersStrip vulnerabilities={vulnerabilities} />
+      </section>
+
       {/* Charts row */}
       <section
         style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 20 }}
@@ -910,22 +985,68 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
               marginBottom: 16,
             }}
           >
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
                 <BarChart3 style={{ width: 22, height: 22, color: "#6B7280" }} aria-hidden="true" />
               </div>
-              Vulnerabilities by Source
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {DIMENSION_TITLES[dimension]}
+              </span>
             </span>
-            <div
-              style={{
-                display: "flex",
-                gap: 4,
-                background: "#F3F4F6",
-                borderRadius: 6,
-                padding: 3,
-              }}
-            >
-              {(["Open", "All"] as const).map((opt) => {
+            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+              {/* Dimension toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 4,
+                  background: "#F3F4F6",
+                  borderRadius: 6,
+                  padding: 3,
+                }}
+                role="tablist"
+                aria-label="Chart dimension"
+              >
+                {([
+                  { id: "application" as const, label: "Application" },
+                  { id: "source" as const,      label: "Source" },
+                  { id: "owner" as const,       label: "Owner" },
+                ]).map((d) => {
+                  const active = dimension === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      onClick={() => setDimension(d.id)}
+                      role="tab"
+                      aria-selected={active}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 500,
+                        padding: "5px 12px",
+                        borderRadius: 4,
+                        border: "none",
+                        cursor: "pointer",
+                        background: active ? "#FFFFFF" : "transparent",
+                        color: active ? "#111827" : "#6B7280",
+                        boxShadow: active ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                        transition: "background 150ms, color 150ms, box-shadow 150ms",
+                      }}
+                    >
+                      {d.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Open/All toggle */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 4,
+                  background: "#F3F4F6",
+                  borderRadius: 6,
+                  padding: 3,
+                }}
+              >
+                {(["Open", "All"] as const).map((opt) => {
                 const val = opt === "Open" ? "open" : "all";
                 const active = chartFilter === val;
                 return (
@@ -949,6 +1070,7 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
                   </button>
                 );
               })}
+              </div>
             </div>
           </div>
 
@@ -1010,7 +1132,11 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
             </div>
           </div>
 
-          <SourceBarChart data={chartFilter === "open" ? SOURCE_CHART_OPEN : SOURCE_CHART_ALL} />
+          <SourceBarChart
+            data={chartData}
+            tickFormatter={dimension === "source" ? undefined : shortDimensionLabel}
+            barSize={dimension === "source" ? 28 : 22}
+          />
         </div>
 
         {/* Right: Days Open donut (40% minus gap) */}

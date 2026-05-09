@@ -198,9 +198,9 @@ const VULN_SUBCATEGORIES = [
 ];
 
 const HOSTING_PLATFORMS = [
-  "BofA Cloud Standard N",
-  "BofA Cloud Static N",
-  "Nextgen BMP N",
+  "BofA Cloud Standard",
+  "BofA Cloud Static",
+  "Nextgen BMP",
 ];
 
 const WORKSTREAMS: Workstream[] = ["MiddlewarePatch", "NonQualysCVE", "ADSF", "CloudConfigCompliance"];
@@ -332,9 +332,31 @@ export function createMockData(): Vulnerability[] {
         ? "Fix"
         : (["Fix", "Defer", "Mitigate", "Accept Risk"][i % 4] as Disposition);
 
+    // Blockers are populated when the disposition is non-Fix and the work is stuck.
+    // Distribution is deterministic on `i` and weighted toward the most common
+    // real-world blockers (vendor delay, no patch) so the rollup is realistic.
+    const BLOCKER_DISTRIBUTION: Blocker[][] = [
+      ["No patch available"],
+      ["Vendor / internal package availability"],
+      ["No patch available", "Testing and partner / peer team dependencies"],
+      ["Vendor / internal package availability"],
+      ["Application re-design / re-architecture required"],
+      ["Third-party dependencies"],
+      ["No patch available"],
+      ["Hardware dependencies"],
+      ["Vendor / internal package availability", "Limited central (bulk) remediation capabilities"],
+      ["Hosting Capacity"],
+      ["No patch available"],
+      ["False positives in Vulnerability and FOSS data"],
+      ["Vendor / internal package availability"],
+      ["Data and reporting limitations"],
+      ["Testing and partner / peer team dependencies"],
+    ];
     const blockers: Blocker[] =
-      disposition === "Defer" || disposition === "Accept Risk"
-        ? (["Vendor / internal package availability", "No patch available"].slice(0, (i % 2) + 1) as Blocker[])
+      disposition === "Defer" ||
+      disposition === "Accept Risk" ||
+      disposition === "Mitigate"
+        ? BLOCKER_DISTRIBUTION[i % BLOCKER_DISTRIBUTION.length] ?? []
         : [];
 
     return {
@@ -446,6 +468,8 @@ export function createMockData(): Vulnerability[] {
       healthCheckComplete: triageStatus === "Resolved" ? "Yes" : "",
       identifiedBlockers: blockers,
       falsePositiveReason: disposition === "False Positive" ? "Asset not in scope for this scan." : "",
+      deferralJustification: disposition === "Defer" ? "Pending vendor patch availability; remediation scheduled for next quarter." : disposition === "Accept Risk" ? "Risk accepted by BISO — asset decommission planned within 90 days." : "",
+      reEvaluateBy: disposition === "Defer" ? `2026-${String(8 + (i % 4)).padStart(2, "0")}-01` : "",
       vulnOwner,
       lastSavedBy: triageStatus === "Awaiting Disposition" ? "" : (VULN_OWNERS[i % VULN_OWNERS.length] ?? ""),
       lastSavedAt: triageStatus === "Awaiting Disposition" ? "" : "2026-05-07T10:30:00.000Z",

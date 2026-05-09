@@ -244,6 +244,62 @@ export const SOURCE_CHART_ALL: SourceChartRow[] = [
   { source: "CTI",     priority1:   400, priority2:   6000, priority3:  41000, priority4:  27000 },
 ];
 
+// TODO: wire to real data — currently stubbed. Same row shape as the source chart;
+// the `source` field carries the dimension's display label (application name / owner).
+// Application names match the APP_NAMES list in lib/mock-data.ts so the grid stays consistent.
+export const APPLICATION_CHART_OPEN: SourceChartRow[] = [
+  { source: "MARKIT Loan Settlement",     priority1: 1500, priority2: 24000, priority3: 165000, priority4: 109500 },
+  { source: "FX Trading Platform",        priority1: 1300, priority2: 21000, priority3: 144000, priority4:  95700 },
+  { source: "US Enterprise Transaction",  priority1: 1100, priority2: 17600, priority3: 121000, priority4:  80300 },
+  { source: "Credit eTrading Platform",   priority1:  950, priority2: 15200, priority3: 104500, priority4:  69350 },
+  { source: "Mercury Portal",             priority1:  800, priority2: 12800, priority3:  88000, priority4:  58400 },
+  { source: "Global Markets Data",        priority1:  650, priority2: 10400, priority3:  71500, priority4:  47450 },
+  { source: "Entity Scanning Solution",   priority1:  525, priority2:  8400, priority3:  57750, priority4:  38325 },
+  { source: "Client Finder",              priority1:  400, priority2:  6400, priority3:  44000, priority4:  29200 },
+  { source: "Enterprise Administration",  priority1:  175, priority2:  2800, priority3:  19250, priority4:  12775 },
+  { source: "AML Defect Reporting Tool",  priority1:  100, priority2:  1600, priority3:  11000, priority4:   7300 },
+];
+
+export const APPLICATION_CHART_ALL: SourceChartRow[] = [
+  { source: "MARKIT Loan Settlement",     priority1: 2700, priority2: 43000, priority3: 297000, priority4: 197000 },
+  { source: "FX Trading Platform",        priority1: 2400, priority2: 38000, priority3: 260000, priority4: 173000 },
+  { source: "US Enterprise Transaction",  priority1: 2000, priority2: 32000, priority3: 218000, priority4: 145000 },
+  { source: "Credit eTrading Platform",   priority1: 1700, priority2: 27500, priority3: 188000, priority4: 125000 },
+  { source: "Mercury Portal",             priority1: 1450, priority2: 23000, priority3: 158500, priority4: 105500 },
+  { source: "Global Markets Data",        priority1: 1170, priority2: 18750, priority3: 128500, priority4:  85500 },
+  { source: "Entity Scanning Solution",   priority1:  945, priority2: 15100, priority3: 104000, priority4:  69200 },
+  { source: "Client Finder",              priority1:  720, priority2: 11500, priority3:  79000, priority4:  52600 },
+  { source: "Enterprise Administration",  priority1:  315, priority2:  5050, priority3:  34700, priority4:  23000 },
+  { source: "AML Defect Reporting Tool",  priority1:  180, priority2:  2900, priority3:  19800, priority4:  13200 },
+];
+
+// TODO: wire to real data — currently stubbed. `source` holds the assigned-remediator name.
+export const OWNER_CHART_OPEN: SourceChartRow[] = [
+  { source: "Scott Zhang",              priority1: 1400, priority2: 22400, priority3: 154000, priority4: 102200 },
+  { source: "Priyanka Gupta",           priority1: 1250, priority2: 20000, priority3: 137500, priority4:  91250 },
+  { source: "Sandip K Dube",            priority1: 1050, priority2: 16800, priority3: 115500, priority4:  76650 },
+  { source: "Sushma Deepika Rupakula",  priority1:  900, priority2: 14400, priority3:  99000, priority4:  65700 },
+  { source: "Rekha Patel",              priority1:  750, priority2: 12000, priority3:  82500, priority4:  54750 },
+  { source: "Maiko Arai",               priority1:  625, priority2: 10000, priority3:  68750, priority4:  45625 },
+  { source: "Mark Farr",                priority1:  500, priority2:  8000, priority3:  55000, priority4:  36500 },
+  { source: "Manas Chanda",             priority1:  400, priority2:  6400, priority3:  44000, priority4:  29200 },
+  { source: "Chris Boswell",            priority1:  325, priority2:  5200, priority3:  35750, priority4:  23725 },
+  { source: "Saurabh Sharma",           priority1:  300, priority2:  4800, priority3:  33000, priority4:  21900 },
+];
+
+export const OWNER_CHART_ALL: SourceChartRow[] = [
+  { source: "Scott Zhang",              priority1: 2550, priority2: 40800, priority3: 280500, priority4: 186200 },
+  { source: "Priyanka Gupta",           priority1: 2275, priority2: 36400, priority3: 250250, priority4: 166075 },
+  { source: "Sandip K Dube",            priority1: 1925, priority2: 30800, priority3: 211750, priority4: 140525 },
+  { source: "Sushma Deepika Rupakula",  priority1: 1650, priority2: 26400, priority3: 181500, priority4: 120450 },
+  { source: "Rekha Patel",              priority1: 1375, priority2: 22000, priority3: 151250, priority4: 100375 },
+  { source: "Maiko Arai",               priority1: 1140, priority2: 18250, priority3: 125400, priority4:  83200 },
+  { source: "Mark Farr",                priority1:  920, priority2: 14700, priority3: 100900, priority4:  66950 },
+  { source: "Manas Chanda",             priority1:  730, priority2: 11700, priority3:  80500, priority4:  53400 },
+  { source: "Chris Boswell",            priority1:  595, priority2:  9500, priority3:  65500, priority4:  43500 },
+  { source: "Saurabh Sharma",           priority1:  550, priority2:  8800, priority3:  60500, priority4:  40150 },
+];
+
 // Days open distribution (pre-aggregated open vulnerabilities)
 export interface DaysOpenData {
   under30:  number;

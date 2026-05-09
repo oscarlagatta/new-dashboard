@@ -208,6 +208,8 @@ export interface Vulnerability {
   healthCheckComplete: "Yes" | "No" | "";
   identifiedBlockers: Blocker[];
   falsePositiveReason: string;
+  deferralJustification: string;
+  reEvaluateBy: string;
   vulnOwner: string;
   lastSavedBy: string;
   lastSavedAt: string;
