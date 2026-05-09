@@ -168,21 +168,46 @@ export function DaysOpenCellRenderer(params: ICellRendererParams) {
   if (days === undefined || days === null)
     return <span className="text-muted-foreground text-xs">—</span>;
 
+  // Determine gradient and styling based on age severity
+  let gradient: string;
+  let textColor: string;
+  let showAlert = false;
+
   if (days > 365) {
-    return (
-      <span className="text-xs text-red-700 font-bold flex items-center gap-1">
-        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-        {days}d
+    // Critical - dark red gradient with alert
+    gradient = "linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #ef4444 100%)";
+    textColor = "text-red-50";
+    showAlert = true;
+  } else if (days > 90) {
+    // High - red gradient
+    gradient = "linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f87171 100%)";
+    textColor = "text-red-50";
+  } else if (days > 30) {
+    // Medium - orange gradient
+    gradient = "linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #f97316 100%)";
+    textColor = "text-orange-50";
+  } else if (days > 14) {
+    // Low - yellow gradient
+    gradient = "linear-gradient(135deg, #a16207 0%, #ca8a04 50%, #eab308 100%)";
+    textColor = "text-yellow-50";
+  } else {
+    // Good - green gradient
+    gradient = "linear-gradient(135deg, #15803d 0%, #16a34a 50%, #22c55e 100%)";
+    textColor = "text-green-50";
+  }
+
+  return (
+    <span className="flex items-center gap-1.5">
+      <span
+        className={`inline-flex items-center justify-center min-w-[32px] h-6 px-1.5 rounded-full text-[10px] font-bold ${textColor} shadow-sm`}
+        style={{ background: gradient }}
+      >
+        {showAlert && <AlertTriangle className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />}
+        {days}
       </span>
-    );
-  }
-  if (days > 90) {
-    return <span className="text-xs text-red-600 font-semibold">{days}d</span>;
-  }
-  if (days > 30) {
-    return <span className="text-xs text-orange-600">{days}d</span>;
-  }
-  return <span className="text-xs">{days}d</span>;
+      <span className="text-[10px] text-muted-foreground">days</span>
+    </span>
+  );
 }
 
 // ── Owner ──────────────────────────────────────────────────────────────────────
