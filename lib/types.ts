@@ -1,35 +1,45 @@
 // Vulnerability Triage Dashboard Types
-// For AG Grid Enterprise v32.3.0 + AG Charts Enterprise v10.0.0
+// AG Grid Enterprise v32.3.0 + AG Charts Enterprise v10.0.0
 
-export type TriageStatus = 
-  | "Awaiting Disposition" 
-  | "In Progress" 
-  | "Pending Clear Scan" 
+export type TriageStatus =
+  | "Awaiting Disposition"
+  | "In Progress"
+  | "Pending Clear Scan"
   | "Resolved";
 
-export type Severity = "Critical" | "High" | "Medium" | "Low";
+export type SeverityRisk =
+  | "Priority 1"
+  | "Priority 2"
+  | "Priority 3"
+  | "Priority 4";
 
-export type Disposition = 
-  | "Fix" 
-  | "Defer" 
-  | "Mitigate" 
-  | "Accept Risk" 
+export type SourceStatus = "Open" | "Closed";
+
+export type Disposition =
+  | "Fix"
+  | "Defer"
+  | "Mitigate"
+  | "Accept Risk"
   | "False Positive"
-  | null;
+  | "";
 
-export type OperatingEnvironment = 
-  | "Production" 
-  | "Non-Production" 
-  | "Development" 
-  | "UAT";
+export type OperatingEnvironment = "In Production" | "Pre-Prod" | "Contingency";
 
-export type VerificationStatus = 
-  | "Verified" 
-  | "Pending Verification" 
-  | "Verification Failed" 
-  | "Not Required";
+export type Workstream =
+  | "MiddlewarePatch"
+  | "NonQualysCVE"
+  | "ADSF"
+  | "CloudConfigCompliance";
 
-export type Source = "Qualys" | "Tenable" | "Rapid7" | "Manual";
+export type Source =
+  | "ADSF"
+  | "MiddlewarePatch"
+  | "ESM"
+  | "BDNA"
+  | "Bladelogic patch"
+  | "CTI Manual Ingestion"
+  | "Cloud Config Compliance"
+  | "Nextgen BMP";
 
 export type Blocker =
   | "Vendor / internal package availability"
@@ -70,174 +80,154 @@ export const PATCH_WINDOWS = [
   "Sun 5/17 08:00–16:00 ET",
 ];
 
+export const DISPOSITIONS: Disposition[] = [
+  "Fix",
+  "Defer",
+  "Mitigate",
+  "Accept Risk",
+  "False Positive",
+];
+
 export interface ActivityLogEntry {
   id: string;
-  odiserId: string;
+  userId: string;
   userName: string;
-  userAvatar?: string;
+  userInitials: string;
   action: string;
   field?: string;
   oldValue?: string;
   newValue?: string;
-  timestamp: Date;
+  timestamp: string; // ISO string — deterministic for SSR
 }
 
 export interface Vulnerability {
-  // Primary identifiers
+  // Source data (read-only from Hadoop/Roger's DB)
   id: string;
-  gisId: string;
-  qualysId: string;
+  qualysId: number;
   cve: string;
   title: string;
-
-  // Status & workflow
-  status: TriageStatus;
-  statusDetails?: string;
-  severity: Severity;
-  severityRisk?: string;
-  verificationStatus: VerificationStatus;
+  severityRisk: SeverityRisk;
+  status: SourceStatus;
+  workstream: Workstream;
   source: Source;
-  sources?: string;
-
-  // Disposition & triage
-  disposition: Disposition;
-  ctiRemediation: boolean | null;
-  identifiedBlockers: Blocker[];
-  requestedPatchWindow?: string;
-  expectedRemediationDate?: Date;
-  crqNumber?: string;
-  remediationComplete: boolean | null;
-  healthCheckTime?: Date;
-  healthCheckComplete: boolean | null;
-  falsePositiveReason?: string;
-
-  // Asset / Host information
+  operatingEnvironment: OperatingEnvironment;
   hostName: string;
   fqdn: string;
+  ipAddresses: string;
   osName: string;
-  osVersion?: string;
-  ipAddresses: string[];
-  operatingEnvironment: OperatingEnvironment;
-  hostingPlatform?: string;
-  isPublicInternetAccessible: boolean;
-  isDmz: boolean;
-  isOnSite: boolean;
-  tier?: string;
-  securityZone?: string;
-
-  // Application & ownership
-  applicationFullName: string;
-  cioDisplayName: string;
-  techExecutive?: string;
-  techExecutiveContact?: string;
-  vulnOwner?: string;
-  vulnOwnerEmail?: string;
-  runbookOwner?: string;
-  mwOwner?: string;
-  operationalCto?: string;
-  financialHierarchy?: string;
-  remediationCoordinator?: string;
-
-  // Vulnerability details
-  description: string;
-  technicalDescription?: string;
-  technicalDetail?: string;
-  vulnerabilityFindings?: string;
-  vulnerabilitySubcategory?: string;
-
-  // Technology
+  deviceType: string;
+  hostingPlatform: string;
   technology: string;
-  technologyVersion?: string;
-
-  // Dates
-  dateObserved: Date;
-  dateLastSeen: Date;
-  hostLastSeen?: Date;
+  technologyVersion: string;
+  applicationFullName: string;
+  applicationId: string;
+  applicationManagerContactName: string;
+  applicationManagerContactNetwork: string;
+  applicationSupportContactName: string;
+  applicationSupportContactNetwork: string;
+  technicalExecutiveContactName: string;
+  technicalExecutiveContactNetwork: string;
+  cioDisplayName: string;
+  operationalCto: string;
+  runbookOwner: string;
+  financialHierarchy: string;
+  patchCategory: string;
+  description: string;
+  technicalDescription: string;
+  technicalDetail: string;
+  vulnerabilityFindings: string;
+  vulnerabilitySubcategory: string;
+  consequenceModel: string;
+  verificationStatus: string;
+  pastDue: "Y" | "N";
   daysOpen: number;
-  dueDate: Date;
-  scheduledFixDate?: Date;
-  remediatedDate?: Date;
-  nextRmw?: Date;
-  lastUpdated: Date;
-  pastDue: boolean;
-
-  // Remediation tracking
-  patchCategory?: string;
-  patchTitle?: string;
-  levers?: string;
-  remediation?: string;
-  vmRemediationGroupingName?: string;
-  vmRemediationInstructions?: string;
-  vmTitleGroup?: string;
-  vmReportDate?: Date;
-
-  // Risk & consequence
-  vendorRiskLevel?: string;
-  firstConsequenceDate?: Date;
-  secondConsequenceDate?: Date;
-  thirdConsequenceDate?: Date;
-  gisExternalFlag: boolean;
-  gisThirdPartyScope?: string;
-  vendorNameManaging?: string;
-  thirdPartyName?: string;
-
-  // Governance & exceptions
-  erpScorecardStatus?: string;
-  erpScorecardPendingId?: string;
-  erpScorecardPendingStatus?: string;
-  erpScorecardPendingExpirationDate?: Date;
-  erpCount?: number;
-  acceptableUseId?: string;
-  acceptableUseStatus?: string;
-  acceptableUseExpirationDate?: Date;
-
-  // Platform & metadata
-  esmType?: string;
-  resourceId?: string;
-  resourceType?: string;
-  policyName?: string;
-  riskTech?: string;
-  isBuiltInHouse: boolean;
-  managed?: string;
-  gisAssetCategory?: string;
-  gisMetricAlignment?: string;
-  workstream?: string;
-  workstreamObservationType?: string;
-  ingestionDate?: Date;
-  freshnessVersionDate?: Date;
-
-  // Activity log
+  dueDate: string;
+  scheduledFixDate: string;
+  resolvedDate: string;
+  reportDate: string;
+  freshnessDate: string;
+  firstConsequenceDate: string;
+  secondConsequenceDate: string;
+  thirdConsequenceDate: string;
+  erpScorecardStatus: string;
+  scorecardErpStatusDetails: string;
+  erpExceptionId: string;
+  erpExceptionRequestStatus: string;
+  erpExceptionExpirationDate: string;
+  erpExceptionRiskDecision: string;
+  erpExceptionBisoRequestStatus: string;
+  associatedErpExceptions: string;
+  erpScorecardPendingId: string;
+  erpScorecardPendingStatus: string;
+  erpScorecardPendingExpirationDate: string;
+  isDmz: "Y" | "N";
+  isPublicInternetAccessible: "Y" | "N";
+  isCisa: "Y" | "N";
+  isOnSite: string;
+  securityZone: string;
+  gisAssetCategory: string;
+  gisMetricAlignment: string;
+  gisExternalFlag: string;
+  gisThirdPartyScope: string;
+  port: string;
+  assessmentArea: string;
+  assessmentScope: string;
+  scorecardSource: string;
+  sigAlgorithm: string;
+  issuerName: string;
+  cloudAccountId: string;
+  resourceId: string;
+  resourceType: string;
+  policyName: string;
+  nonBauReason: string;
+  domain: string;
+  thirdPartyName: string;
+  remediation: string;
+  scorecardErpDays: string;
+  evm: string;
+  tppe: string;
+  acceptableUseId: string;
+  acceptableUseExpirationDate: string;
+  acceptableUseStatus: string;
+  decommissionRequestNumber: string;
+  decommissionRequestStatus: string;
+  esmType: string;
+  dateObserved: string;
+  dateLastSeen: string;
+  hostLastSeen: string;
+  classificationDate: string;
+  // Triage state (written by this UI)
+  triageStatus: TriageStatus;
+  disposition: Disposition;
+  ctiRemediation: "Yes" | "No" | "";
+  requestedPatchWindow: string;
+  expectedRemediationDate: string;
+  crqNumber: string;
+  remediationPendingClearScan: "Yes" | "No" | "";
+  healthCheckTime: string;
+  healthCheckComplete: "Yes" | "No" | "";
+  identifiedBlockers: Blocker[];
+  falsePositiveReason: string;
+  vulnOwner: string;
+  lastSavedBy: string;
+  lastSavedAt: string;
   activityLog: ActivityLogEntry[];
-
-  // Metadata
-  lastSavedAt?: Date;
-  lastSavedBy?: string;
 }
 
 export interface CioTeam {
   id: string;
   name: string;
-  code: string;
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
+  initials: string;
 }
 
-// Sparkline data point for stat cards
+// Sparkline data for stat cards
 export interface SparklineDataPoint {
-  date: string;
+  day: number;
   value: number;
-}
-
-// Chart data for severity x status
-export interface SeverityStatusData {
-  severity: Severity;
-  awaitingDisposition: number;
-  inProgress: number;
-  pendingClearScan: number;
-  resolved: number;
 }
