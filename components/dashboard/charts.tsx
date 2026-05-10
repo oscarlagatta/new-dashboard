@@ -61,26 +61,26 @@ interface SourceBarChartProps {
   barSize?: number;
 }
 
-export function SourceBarChart({ data, tickFormatter, barSize = 28 }: SourceBarChartProps) {
+export function SourceBarChart({ data, tickFormatter, barSize = 22 }: SourceBarChartProps) {
   const chartData = data;
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={chartData} barSize={barSize} barGap={4} barCategoryGap="25%">
+    <ResponsiveContainer width="100%" height="100%" minHeight={140}>
+      <BarChart data={chartData} barSize={barSize} barGap={3} barCategoryGap="25%" margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
         <XAxis
           dataKey="source"
-          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+          tick={{ fontSize: 10, fill: "#9CA3AF" }}
           axisLine={false}
           tickLine={false}
           interval={0}
           tickFormatter={tickFormatter}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+          tick={{ fontSize: 10, fill: "#9CA3AF" }}
           axisLine={false}
           tickLine={false}
-          width={36}
+          width={32}
           allowDecimals={false}
           tickFormatter={(v: number) => formatCount(v)}
         />
@@ -95,14 +95,14 @@ export function SourceBarChart({ data, tickFormatter, barSize = 28 }: SourceBarC
           cursor={{ fill: "rgba(0,0,0,0.03)" }}
           formatter={(value: number, name: string) => [formatCount(value), name]}
         />
-        <Bar dataKey="priority1" name="Priority 1" fill={P_COLORS.p1} radius={[6, 6, 0, 0]} />
-        <Bar dataKey="priority2" name="Priority 2" fill={P_COLORS.p2} radius={[6, 6, 0, 0]} />
-        <Bar dataKey="priority3" name="Priority 3" fill={P_COLORS.p3} radius={[6, 6, 0, 0]} />
-        <Bar dataKey="priority4" name="Priority 4" fill={P_COLORS.p4} radius={[6, 6, 0, 0]} />
+        <Bar dataKey="priority1" name="Priority 1" fill={P_COLORS.p1} radius={[5, 5, 0, 0]} />
+        <Bar dataKey="priority2" name="Priority 2" fill={P_COLORS.p2} radius={[5, 5, 0, 0]} />
+        <Bar dataKey="priority3" name="Priority 3" fill={P_COLORS.p3} radius={[5, 5, 0, 0]} />
+        <Bar dataKey="priority4" name="Priority 4" fill={P_COLORS.p4} radius={[5, 5, 0, 0]} />
         <Legend
           iconType="circle"
-          iconSize={10}
-          wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+          iconSize={8}
+          wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
           formatter={(value) => (
             <span style={{ color: "#6B7280", fontWeight: 500 }}>{value}</span>
           )}
@@ -125,10 +125,10 @@ interface Segment {
 
 // Ordered largest→smallest so smaller circles render on top when overlapping
 const BUBBLES = [
-  { label: "30–90d",  color: "#FBBF24", cx:  95, cy:  95, r: 85 },
-  { label: "90–365d", color: "#F97316", cx: 220, cy:  80, r: 70 },
-  { label: "< 30d",   color: "#22C55E", cx: 225, cy: 150, r: 48 },
-  { label: "> 365d",  color: "#EF4444", cx: 165, cy: 165, r: 32 },
+  { label: "30–90d",  color: "#FBBF24", cx:  78, cy:  62, r: 56 },
+  { label: "90–365d", color: "#F97316", cx: 188, cy:  52, r: 46 },
+  { label: "< 30d",   color: "#22C55E", cx: 200, cy:  98, r: 32 },
+  { label: "> 365d",  color: "#EF4444", cx: 142, cy: 108, r: 22 },
 ];
 
 export function DaysOpenChart({ data }: DaysOpenChartProps) {
@@ -148,13 +148,13 @@ export function DaysOpenChart({ data }: DaysOpenChartProps) {
   for (const s of segments) countByLabel[s.label] = s.count;
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Bubble cluster */}
-      <div style={{ overflow: "visible" }}>
+      <div style={{ overflow: "visible", flexShrink: 0 }}>
         <svg
-          viewBox="0 0 300 200"
+          viewBox="0 0 300 130"
           width="100%"
-          height="200"
+          height="130"
           aria-label="Days open distribution bubbles"
           role="img"
           style={{ overflow: "visible" }}
@@ -198,10 +198,10 @@ export function DaysOpenChart({ data }: DaysOpenChartProps) {
       </div>
 
       {/* Divider */}
-      <div style={{ height: 1, background: "#E5E7EB", margin: "14px 0 10px" }} />
+      <div style={{ height: 1, background: "#E5E7EB", margin: "8px 0 6px", flexShrink: 0 }} />
 
-      {/* Progress bar rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Progress bar rows — distribute vertically so card grows naturally */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0, justifyContent: "space-between" }}>
         {segments.map((seg) => (
           <div key={seg.label}>
             <div
@@ -209,20 +209,20 @@ export function DaysOpenChart({ data }: DaysOpenChartProps) {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 5,
+                marginBottom: 3,
               }}
             >
-              <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#374151" }}>
                 {seg.label}
-                <span style={{ fontSize: 11, fontWeight: 400, color: "#9CA3AF", marginLeft: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 400, color: "#9CA3AF", marginLeft: 6 }}>
                   {formatCount(seg.count)}
                 </span>
               </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#374151", fontVariantNumeric: "tabular-nums" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#374151", fontVariantNumeric: "tabular-nums" }}>
                 {seg.pct}%
               </span>
             </div>
-            <div style={{ height: 6, borderRadius: 3, background: "#E5E7EB", overflow: "hidden" }}>
+            <div style={{ height: 5, borderRadius: 3, background: "#E5E7EB", overflow: "hidden" }}>
               <div
                 style={{
                   height: "100%",
@@ -242,8 +242,8 @@ export function DaysOpenChart({ data }: DaysOpenChartProps) {
 
 export function RemediationTrendChart() {
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <AreaChart data={REMEDIATION_TREND} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height="100%" minHeight={130}>
+      <AreaChart data={REMEDIATION_TREND} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
         <defs>
           <linearGradient id="gradOpened" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#EF4444" stopOpacity={0.18} />
@@ -257,15 +257,15 @@ export function RemediationTrendChart() {
         <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
         <XAxis
           dataKey="week"
-          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+          tick={{ fontSize: 10, fill: "#9CA3AF" }}
           axisLine={false}
           tickLine={false}
         />
         <YAxis
-          tick={{ fontSize: 11, fill: "#9CA3AF" }}
+          tick={{ fontSize: 10, fill: "#9CA3AF" }}
           axisLine={false}
           tickLine={false}
-          width={36}
+          width={32}
           allowDecimals={false}
           tickFormatter={(v: number) => formatCount(v)}
         />
@@ -285,7 +285,7 @@ export function RemediationTrendChart() {
           dataKey="opened"
           name="Opened"
           stroke="#EF4444"
-          strokeWidth={2.5}
+          strokeWidth={2}
           fill="url(#gradOpened)"
           dot={false}
           activeDot={{ r: 4, strokeWidth: 0 }}
@@ -295,15 +295,15 @@ export function RemediationTrendChart() {
           dataKey="closed"
           name="Closed"
           stroke="#22C55E"
-          strokeWidth={2.5}
+          strokeWidth={2}
           fill="url(#gradClosed)"
           dot={false}
           activeDot={{ r: 4, strokeWidth: 0 }}
         />
         <Legend
           iconType="circle"
-          iconSize={10}
-          wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+          iconSize={8}
+          wrapperStyle={{ fontSize: 11, paddingTop: 4 }}
           formatter={(value) => (
             <span style={{ color: "#6B7280", fontWeight: 500 }}>{value}</span>
           )}
@@ -315,12 +315,12 @@ export function RemediationTrendChart() {
 
 export function SlaComplianceChart() {
   return (
-    <div style={{ display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Overall metric */}
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 14, flexShrink: 0 }}>
         <span
           style={{
-            fontSize: 56,
+            fontSize: 36,
             fontWeight: 800,
             color: "#111827",
             lineHeight: 1,
@@ -328,19 +328,19 @@ export function SlaComplianceChart() {
           }}
         >
           {SLA_OVERALL_COMPLIANCE}
-          <span style={{ fontSize: 32, fontWeight: 700, color: "#6B7280" }}>%</span>
+          <span style={{ fontSize: 22, fontWeight: 700, color: "#6B7280" }}>%</span>
         </span>
-        <div style={{ paddingBottom: 6 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: "#374151" }}>Overall SLA Compliance</div>
-          <div style={{ fontSize: 12, color: "#EF4444", marginTop: 3, display: "flex", alignItems: "center", gap: 3 }}>
+        <div style={{ paddingBottom: 3 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, color: "#374151" }}>Overall SLA Compliance</div>
+          <div style={{ fontSize: 11, color: "#EF4444", marginTop: 2, display: "flex", alignItems: "center", gap: 3 }}>
             <span>▼</span>
             <span>2% below 95% target</span>
           </div>
         </div>
       </div>
 
-      {/* Priority rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {/* Priority rows — flex 1 spreads them when the card is tall */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minHeight: 0, justifyContent: "space-around" }}>
         {SLA_COMPLIANCE_BY_PRIORITY.map((row) => {
           const onTarget = row.compliance >= row.target;
           const barColor = onTarget ? "#22C55E" : row.compliance >= row.target - 5 ? "#F97316" : "#EF4444";
@@ -351,18 +351,18 @@ export function SlaComplianceChart() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "baseline",
-                  marginBottom: 7,
+                  marginBottom: 4,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>
                     {row.priority}
                   </span>
-                  <span style={{ fontSize: 11, color: "#9CA3AF" }}>{row.slaDays}-day SLA</span>
+                  <span style={{ fontSize: 10, color: "#9CA3AF" }}>{row.slaDays}-day SLA</span>
                 </div>
                 <span
                   style={{
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: onTarget ? "#16A34A" : "#DC2626",
                     fontVariantNumeric: "tabular-nums",
@@ -372,13 +372,13 @@ export function SlaComplianceChart() {
                 </span>
               </div>
               {/* Track with target marker */}
-              <div style={{ position: "relative", height: 10, borderRadius: 5, background: "#EBEBEB" }}>
+              <div style={{ position: "relative", height: 8, borderRadius: 4, background: "#EBEBEB" }}>
                 <div
                   style={{
                     height: "100%",
                     width: `${row.compliance}%`,
                     background: barColor,
-                    borderRadius: 5,
+                    borderRadius: 4,
                     transition: "width 600ms ease",
                   }}
                 />
@@ -388,7 +388,7 @@ export function SlaComplianceChart() {
                     top: -3,
                     left: `${row.target}%`,
                     width: 2,
-                    height: 16,
+                    height: 14,
                     background: "#374151",
                     borderRadius: 1,
                     transform: "translateX(-50%)",
@@ -406,13 +406,14 @@ export function SlaComplianceChart() {
           display: "flex",
           alignItems: "center",
           gap: 6,
-          marginTop: 20,
-          paddingTop: 16,
+          marginTop: 12,
+          paddingTop: 10,
           borderTop: "1px solid #F3F4F6",
+          flexShrink: 0,
         }}
       >
-        <div style={{ width: 2, height: 14, background: "#374151", borderRadius: 1 }} />
-        <span style={{ fontSize: 12, color: "#6B7280" }}>95% target threshold</span>
+        <div style={{ width: 2, height: 12, background: "#374151", borderRadius: 1 }} />
+        <span style={{ fontSize: 11, color: "#6B7280" }}>95% target threshold</span>
       </div>
     </div>
   );

@@ -62,7 +62,7 @@ export function BlockersStrip({ vulnerabilities, onSelectBlocker }: BlockersStri
       style={{
         background: "#FFFFFF",
         borderRadius: 16,
-        padding: "26px 28px 24px",
+        padding: "14px 18px 14px",
         border: "1px solid #E5E7EB",
         boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.04)",
       }}
@@ -73,15 +73,15 @@ export function BlockersStrip({ vulnerabilities, onSelectBlocker }: BlockersStri
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
-          marginBottom: 4,
+          gap: 10,
+          marginBottom: 10,
         }}
       >
         <div
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
+            width: 26,
+            height: 26,
+            borderRadius: 7,
             background: "#FEF2F2",
             display: "flex",
             alignItems: "center",
@@ -91,12 +91,12 @@ export function BlockersStrip({ vulnerabilities, onSelectBlocker }: BlockersStri
           aria-hidden="true"
         >
           <TrendingDown
-            style={{ width: 18, height: 18, color: "#DC2626" }}
+            style={{ width: 15, height: 15, color: "#DC2626" }}
           />
         </div>
         <h2
           style={{
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: 600,
             color: "#111827",
             margin: 0,
@@ -107,32 +107,21 @@ export function BlockersStrip({ vulnerabilities, onSelectBlocker }: BlockersStri
         </h2>
         <span
           style={{
-            fontSize: 14,
+            fontSize: 12,
             fontWeight: 500,
             color: "#6B7280",
             fontVariantNumeric: "tabular-nums",
           }}
         >
-          · {formatCount(blockedRecords)} blocked vulnerabilities
+          · {formatCount(blockedRecords)} blocked
         </span>
       </div>
-
-      <p
-        style={{
-          fontSize: 13,
-          color: "#9CA3AF",
-          margin: "0 0 18px 44px",
-          lineHeight: 1.4,
-        }}
-      >
-        Aggregate of triage decisions across unresolved vulnerabilities — by reason
-      </p>
 
       {/* Weighted chips, count-descending */}
       <div
         style={{
           display: "flex",
-          gap: 10,
+          gap: 8,
           flexWrap: "wrap",
         }}
       >
@@ -163,31 +152,31 @@ function BlockerChip({
 }) {
   const tokens = {
     lg: {
-      padX: 16,
-      padY: 12,
-      countSize: 24,
+      padX: 12,
+      padY: 7,
+      countSize: 18,
       countWeight: 700,
-      labelSize: 13,
+      labelSize: 12,
       bg: "#FEF2F2",
       border: "#FECACA",
       hoverBg: "#FEE2E2",
     },
     md: {
-      padX: 14,
-      padY: 10,
-      countSize: 20,
+      padX: 11,
+      padY: 6,
+      countSize: 16,
       countWeight: 700,
-      labelSize: 12,
+      labelSize: 11,
       bg: "#FFFFFF",
       border: "#E5E7EB",
       hoverBg: "#F9FAFB",
     },
     sm: {
-      padX: 12,
-      padY: 8,
-      countSize: 16,
+      padX: 10,
+      padY: 5,
+      countSize: 14,
       countWeight: 600,
-      labelSize: 11,
+      labelSize: 10,
       bg: "#FFFFFF",
       border: "#E5E7EB",
       hoverBg: "#F9FAFB",

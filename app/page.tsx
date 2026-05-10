@@ -352,7 +352,7 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         borderRadius: 0,
         boxShadow: "none",
         border: "none",
-        padding: "0 0 16px 0",
+        padding: "0 0 6px 0",
         margin: 0,
         display: "flex",
         alignItems: "center",
@@ -365,7 +365,7 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
       <div style={{ minWidth: 0 }}>
         <h1
           style={{
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: 600,
             color: "#111827",
             lineHeight: 1.2,
@@ -375,25 +375,13 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         >
           Security Risk Console
         </h1>
-        <p
-          style={{
-            fontSize: 13,
-            fontWeight: 400,
-            color: "#9CA3AF",
-            margin: "2px 0 10px",
-            lineHeight: 1.4,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          Real-time vulnerability remediation across all teams.
-        </p>
-        <MetaRow
-          stats={stats}
-          department={department}
-          onNavigate={onNavigate}
-        />
+        <div style={{ marginTop: 4 }}>
+          <MetaRow
+            stats={stats}
+            department={department}
+            onNavigate={onNavigate}
+          />
+        </div>
       </div>
 
       {/* Right: search + bell + CIO */}
@@ -591,9 +579,9 @@ function MetaRow({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 14,
+        gap: 12,
         flexWrap: "wrap",
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 500,
         color: "#374151",
       }}
@@ -722,10 +710,10 @@ function StatCard({
         boxShadow: hovered
           ? "0 6px 20px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04)"
           : CARD_SHADOW,
-        padding: "20px 22px 18px 22px",
+        padding: "14px 18px 12px 18px",
         flex: 1,
         minWidth: 0,
-        minHeight: 158,
+        minHeight: 122,
         position: "relative",
         overflow: "hidden",
         transform: hovered ? "translateY(-1px)" : "translateY(0)",
@@ -758,7 +746,7 @@ function StatCard({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "flex-start",
-          marginBottom: 14,
+          marginBottom: 8,
           gap: 8,
         }}
       >
@@ -804,12 +792,12 @@ function StatCard({
       {/* Count */}
       <p
         style={{
-          fontSize: 44,
+          fontSize: 32,
           fontWeight: 700,
           color: "#111827",
           lineHeight: 1,
           fontVariantNumeric: "tabular-nums",
-          margin: "0 0 12px",
+          margin: "0 0 8px",
         }}
         aria-label={`${count} ${label}`}
       >
@@ -952,10 +940,10 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column" }} aria-label="Dashboard">
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }} aria-label="Dashboard">
       {/* Stat cards */}
       <section
-        style={{ display: "flex", gap: 16, marginBottom: 16, alignItems: "stretch" }}
+        style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "stretch" }}
         aria-label="Summary statistics"
       >
         {STAT_CARDS.map((card) => (
@@ -964,30 +952,30 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
       </section>
 
       {/* Blockers rollup — turns triage decisions into org-level visibility */}
-      <section style={{ marginBottom: 20 }} aria-label="Remediation blockers">
+      <section style={{ marginBottom: 10 }} aria-label="Remediation blockers">
         <BlockersStrip vulnerabilities={vulnerabilities} />
       </section>
 
       {/* Charts row */}
       <section
-        style={{ display: "flex", gap: 16, alignItems: "stretch", marginBottom: 20 }}
+        style={{ display: "flex", gap: 12, alignItems: "stretch", marginBottom: 10, flex: 1, minHeight: 0 }}
         aria-label="Data visualizations"
       >
         {/* Left: Source bar chart (60%) */}
         <div
-          style={{ flex: "0 0 60%", ...cardStyle, background: "#F9FAFB", padding: "22px 24px" }}
+          style={{ flex: "0 0 60%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}
         >
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 16,
+              marginBottom: 10,
             }}
           >
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <BarChart3 style={{ width: 22, height: 22, color: "#6B7280" }} aria-hidden="true" />
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                <BarChart3 style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
               <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {DIMENSION_TITLES[dimension]}
@@ -1019,9 +1007,9 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
                       role="tab"
                       aria-selected={active}
                       style={{
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: 500,
-                        padding: "5px 12px",
+                        padding: "4px 10px",
                         borderRadius: 4,
                         border: "none",
                         cursor: "pointer",
@@ -1054,9 +1042,9 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
                     key={opt}
                     onClick={() => setChartFilter(val)}
                     style={{
-                      fontSize: 16,
+                      fontSize: 12,
                       fontWeight: 500,
-                      padding: "5px 14px",
+                      padding: "4px 12px",
                       borderRadius: 4,
                       border: "none",
                       cursor: "pointer",
@@ -1075,11 +1063,11 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
           </div>
 
           {/* Summary numbers */}
-          <div style={{ display: "flex", gap: 36, marginBottom: 8 }}>
+          <div style={{ display: "flex", gap: 28, marginBottom: 4 }}>
             <div>
               <div
                 style={{
-                  fontSize: 56,
+                  fontSize: 30,
                   fontWeight: 800,
                   color: "#111827",
                   lineHeight: 1,
@@ -1088,25 +1076,17 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
               >
                 {formatCount(openClosed.open)}
               </div>
-              <div style={{ fontSize: 13, color: "#6B7280", marginTop: 3 }}>Open</div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#22C55E",
-                  marginTop: 4,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                }}
-              >
-                <ArrowUp style={{ width: 11, height: 11 }} aria-hidden="true" />
-                4.1% vs last report
+              <div style={{ fontSize: 11, color: "#6B7280", marginTop: 2 }}>
+                Open
+                <span style={{ color: "#22C55E", marginLeft: 8, fontWeight: 600 }}>
+                  ▲ 4.1%
+                </span>
               </div>
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 56,
+                  fontSize: 30,
                   fontWeight: 800,
                   color: "#6B7280",
                   lineHeight: 1,
@@ -1115,37 +1095,34 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
               >
                 {formatCount(openClosed.closed)}
               </div>
-              <div style={{ fontSize: 13, color: "#9CA3AF", marginTop: 3 }}>Closed</div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "#22C55E",
-                  marginTop: 4,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3,
-                }}
-              >
-                <ArrowDown style={{ width: 11, height: 11 }} aria-hidden="true" />
-                2% vs last report
+              <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2 }}>
+                Closed
+                <span style={{ color: "#22C55E", marginLeft: 8, fontWeight: 600 }}>
+                  ▼ 2%
+                </span>
               </div>
             </div>
           </div>
 
-          <SourceBarChart
-            data={chartData}
-            tickFormatter={dimension === "source" ? undefined : shortDimensionLabel}
-            barSize={dimension === "source" ? 28 : 22}
-          />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <SourceBarChart
+              data={chartData}
+              tickFormatter={dimension === "source" ? undefined : shortDimensionLabel}
+              barSize={dimension === "source" ? 28 : 22}
+            />
+          </div>
         </div>
 
         {/* Right: Days Open donut (40% minus gap) */}
         <div
           style={{
-            flex: "0 0 calc(40% - 8px)",
+            flex: "0 0 calc(40% - 6px)",
             ...cardStyle,
             background: "#F9FAFB",
-            padding: "22px 24px",
+            padding: "14px 18px",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
           }}
         >
           <div
@@ -1156,21 +1133,21 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
               marginBottom: 4,
             }}
           >
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <Clock style={{ width: 22, height: 22, color: "#6B7280" }} aria-hidden="true" />
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                <Clock style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
               Days Open
             </span>
             <button
               style={{
-                fontSize: 16,
+                fontSize: 12,
                 fontWeight: 500,
                 color: "#6B7280",
                 background: "none",
                 border: "1px solid #E5E7EB",
                 borderRadius: 6,
-                padding: "5px 14px",
+                padding: "4px 10px",
                 cursor: "pointer",
                 display: "flex",
                 alignItems: "center",
@@ -1178,58 +1155,64 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
               }}
             >
               This Report
-              <ChevronDown style={{ width: 16, height: 16 }} aria-hidden="true" />
+              <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
             </button>
           </div>
-          <DaysOpenChart data={DAYS_OPEN_DATA} />
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <DaysOpenChart data={DAYS_OPEN_DATA} />
+          </div>
         </div>
       </section>
 
       {/* Second charts row — Remediation Trend + SLA Compliance */}
       <section
-        style={{ display: "flex", gap: 16, alignItems: "stretch" }}
+        style={{ display: "flex", gap: 12, alignItems: "stretch", flex: 1, minHeight: 0 }}
         aria-label="Trend and SLA analytics"
       >
         {/* Remediation Trend */}
-        <div style={{ flex: "0 0 55%", ...cardStyle, background: "#F9FAFB", padding: "22px 24px" }}>
+        <div style={{ flex: "0 0 55%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 16,
+              marginBottom: 8,
             }}
           >
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <TrendingUp style={{ width: 22, height: 22, color: "#6B7280" }} aria-hidden="true" />
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                <TrendingUp style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
               Remediation Trend
             </span>
-            <span style={{ fontSize: 12, color: "#9CA3AF" }}>Last 12 weeks</span>
+            <span style={{ fontSize: 11, color: "#9CA3AF" }}>Last 12 weeks</span>
           </div>
-          <RemediationTrendChart />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <RemediationTrendChart />
+          </div>
         </div>
 
         {/* SLA Compliance */}
-        <div style={{ flex: "0 0 calc(45% - 8px)", ...cardStyle, background: "#F9FAFB", padding: "22px 24px" }}>
+        <div style={{ flex: "0 0 calc(45% - 6px)", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: 20,
+              marginBottom: 10,
             }}
           >
-            <span style={{ fontSize: 20, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <CheckCircle2 style={{ width: 22, height: 22, color: "#6B7280" }} aria-hidden="true" />
+            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
               SLA Compliance
             </span>
-            <span style={{ fontSize: 12, color: "#9CA3AF" }}>By priority</span>
+            <span style={{ fontSize: 11, color: "#9CA3AF" }}>By priority</span>
           </div>
-          <SlaComplianceChart />
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <SlaComplianceChart />
+          </div>
         </div>
       </section>
 
@@ -1360,8 +1343,8 @@ export default function App() {
           fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
           display: "flex",
           flexDirection: "column",
-          gap: 20,
-          padding: "24px",
+          gap: 12,
+          padding: "16px 20px",
         }}
       >
         {/* Floating header card */}
@@ -1376,7 +1359,7 @@ export default function App() {
         <main
           id="main-content"
           tabIndex={-1}
-          style={{ flex: 1 }}
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
         >
           {currentPage === "dashboard" ? (
             <DashboardPage
@@ -1399,7 +1382,7 @@ export default function App() {
         </main>
 
         {/* Bottom breathing room */}
-        <div style={{ height: 20, flexShrink: 0 }} />
+        <div style={{ height: 4, flexShrink: 0 }} />
       </div>
 
       {/* ARIA live region */}
