@@ -705,6 +705,9 @@ export function AgGridTriageTable({
       floatingFilter: true,
       suppressHeaderMenuButton: false,
       menuTabs: ["filterMenuTab", "generalMenuTab", "columnsMenuTab"],
+      enableRowGroup: true,
+      enableValue: true,
+      enablePivot: true,
     }),
     []
   );
@@ -1041,6 +1044,7 @@ export function AgGridTriageTable({
             isExternalFilterPresent={isExternalFilterPresent}
             doesExternalFilterPass={doesExternalFilterPass}
             rowGroupPanelShow="always"
+            pivotPanelShow="always"
             groupDisplayType="singleColumn"
             getRowId={(p) => p.data.id}
           />
