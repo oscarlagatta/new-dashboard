@@ -12,7 +12,9 @@ import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-quartz.css";
 import type {
   ColDef,
+  ColumnState,
   GetContextMenuItemsParams,
+  GridSizeChangedEvent,
   MenuItemDef,
   GridReadyEvent,
   SelectionChangedEvent,
@@ -38,7 +40,9 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { DetailSheet } from "@/components/vulnerability/detail-sheet";
+import { VulnerabilityCard } from "@/components/executive/vulnerability-card";
 import { severityRiskComparator, statusComparator } from "@/lib/ag-grid-setup";
+import { useViewport } from "@/lib/use-viewport";
 import {
   TriageStatusBadgeCellRenderer,
   SeverityBadgeCellRenderer,
@@ -64,6 +68,20 @@ import "@/lib/ag-grid-setup";
 // object. Pagination is handled server-side.
 
 type DensityMode = "compact" | "comfortable";
+
+// Tablet (768–1023px): keep this lean set so columns fit at ~1024px without
+// horizontal scroll. Hidden columns remain available via the side-panel
+// Columns tool when the user pulls it up.
+const TABLET_VISIBLE_FIELDS = new Set<string>([
+  "triageStatus",
+  "severityRisk",
+  "status",
+  "cve",
+  "title",
+  "hostName",
+  "dueDate",
+  "vulnOwner",
+]);
 
 const FILTER_OPTIONS = {
   sourceStatus: ["Open", "Closed"],
@@ -325,6 +343,9 @@ export function AgGridTriageTable({
   );
   const [selectedCount, setSelectedCount] = useState(0);
   const [density, setDensity] = useState<DensityMode>("comfortable");
+  const viewport = useViewport();
+  const isMobile = viewport === "mobile";
+  const isTablet = viewport === "tablet";
 
   const rowHeight = density === "compact" ? 32 : 36;
 
@@ -337,16 +358,10 @@ export function AgGridTriageTable({
     return chips;
   }, [filters]);
 
-  // Apply external filters via grid's external filter mechanism
-  const isExternalFilterPresent = useCallback(
-    () => activeFilters.length > 0,
-    [activeFilters]
-  );
-
-  const doesExternalFilterPass = useCallback(
-    (node: IRowNode<Vulnerability>) => {
-      if (!node.data) return true;
-      const v = node.data;
+  // Shared predicate so the grid (desktop/tablet) and card list (mobile)
+  // apply the same filter logic.
+  const matchesFilters = useCallback(
+    (v: Vulnerability) => {
       for (const [key, vals] of Object.entries(filters) as [FilterKey, Set<string>][]) {
         if (!vals.size) continue;
         const fieldMap: Partial<Record<FilterKey, string>> = {
@@ -365,6 +380,32 @@ export function AgGridTriageTable({
     },
     [filters]
   );
+
+  // Apply external filters via grid's external filter mechanism
+  const isExternalFilterPresent = useCallback(
+    () => activeFilters.length > 0,
+    [activeFilters]
+  );
+
+  const doesExternalFilterPass = useCallback(
+    (node: IRowNode<Vulnerability>) => !node.data || matchesFilters(node.data),
+    [matchesFilters]
+  );
+
+  // Card-list mode (mobile) — apply quick-filter + external filters here since
+  // there's no grid to host them. Sort by severity priority so worst-first.
+  const cardVulns = useMemo(() => {
+    if (!isMobile) return [] as Vulnerability[];
+    const q = quickFilter.trim().toLowerCase();
+    const haystack = (v: Vulnerability) =>
+      [v.cve, v.hostName, v.applicationFullName, v.title, v.workstream, v.vulnOwner]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+    return vulnerabilities
+      .filter((v) => (!q || haystack(v).includes(q)) && matchesFilters(v))
+      .sort((a, b) => severityRiskComparator(a.severityRisk, b.severityRisk));
+  }, [isMobile, vulnerabilities, quickFilter, matchesFilters]);
 
   const columnDefs: ColDef<Vulnerability>[] = useMemo(
     () => [
@@ -736,6 +777,42 @@ export function AgGridTriageTable({
     setGridApi(e.api);
   }, []);
 
+  // On tablet, fit visible columns into the available width whenever the
+  // grid resizes (drawer toggle, orientation change, browser resize). Skipped
+  // on desktop so users keep their explicit column widths.
+  const onGridSizeChanged = useCallback(
+    (e: GridSizeChangedEvent) => {
+      if (isTablet) e.api.sizeColumnsToFit();
+    },
+    [isTablet]
+  );
+
+  // Adjust column visibility when the viewport bucket changes. On tablet we
+  // collapse to TABLET_VISIBLE_FIELDS; on desktop we restore each column's
+  // declared default. User toggles via the side panel persist within a
+  // viewport but reset when the bucket changes.
+  useEffect(() => {
+    if (!gridApi || isMobile) return;
+    const cols = gridApi.getColumns?.() ?? [];
+    const state: ColumnState[] = cols
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((col: any) => {
+        const colId: string = col.getColId();
+        const def = col.getColDef() as ColDef<Vulnerability>;
+        const field = def.field as string | undefined;
+        // Checkbox / pinned cols without a field — leave alone.
+        if (!field) return null;
+        if (isTablet) {
+          return { colId, hide: !TABLET_VISIBLE_FIELDS.has(field) } as ColumnState;
+        }
+        return { colId, hide: !!def.hide } as ColumnState;
+      })
+      .filter((s: ColumnState | null): s is ColumnState => s !== null);
+    gridApi.applyColumnState({ state, applyOrder: false });
+    gridApi.setGridOption("suppressHorizontalScroll", isTablet);
+    if (isTablet) gridApi.sizeColumnsToFit();
+  }, [gridApi, isTablet, isMobile]);
+
   const onSelectionChanged = useCallback((e: SelectionChangedEvent) => {
     setSelectedCount(e.api.getSelectedRows().length);
     const status = document.getElementById("grid-status");
@@ -937,39 +1014,42 @@ export function AgGridTriageTable({
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Density toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={() => setDensity((d) => (d === "compact" ? "comfortable" : "compact"))}
-            aria-label={`Switch to ${density === "compact" ? "comfortable" : "compact"} density`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            {density === "compact" ? "Comfortable" : "Compact"}
-          </Button>
+          {/* Density + Export — grid-only affordances, hidden in card mode */}
+          {!isMobile && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={() => setDensity((d) => (d === "compact" ? "comfortable" : "compact"))}
+                aria-label={`Switch to ${density === "compact" ? "comfortable" : "compact"} density`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                {density === "compact" ? "Comfortable" : "Compact"}
+              </Button>
 
-          {/* Export */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={exportExcel}
-            aria-label="Export to Excel"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs gap-1.5"
-            onClick={exportCsv}
-            aria-label="Export to CSV"
-          >
-            <Download className="h-3.5 w-3.5" />
-            CSV
-          </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={exportExcel}
+                aria-label="Export to Excel"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5"
+                onClick={exportCsv}
+                aria-label="Export to CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+                CSV
+              </Button>
+            </>
+          )}
         </div>
 
         {/* Active filter chips */}
@@ -1005,50 +1085,77 @@ export function AgGridTriageTable({
           </div>
         )}
 
-        {/* AG Grid */}
-        <div
-          className="ag-theme-quartz w-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid"
-          style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
-        >
-          <AgGridReact<Vulnerability>
-            ref={gridRef}
-            rowData={vulnerabilities}
-            columnDefs={columnDefs}
-            defaultColDef={defaultColDef}
-            onGridReady={onGridReady}
-            onRowClicked={onRowClicked}
-            onSelectionChanged={onSelectionChanged}
-            rowSelection={{
-              mode: "multiRow",
-              checkboxes: true,
-              headerCheckbox: true,
-              enableClickSelection: false,
-            }}
-            suppressRowClickSelection={true}
-            enableRangeSelection={true}
-            enableCharts={true}
-            cellSelection={true}
-            pagination={true}
-            paginationPageSize={50}
-            paginationPageSizeSelector={[25, 50, 100, 200]}
-            animateRows={true}
-            enableCellTextSelection={true}
-            suppressMenuHide={false}
-            tooltipShowDelay={500}
-            floatingFiltersHeight={36}
-            headerHeight={40}
-            rowHeight={rowHeight}
-            sideBar={sideBar}
-            statusBar={statusBar}
-            getContextMenuItems={getContextMenuItems}
-            isExternalFilterPresent={isExternalFilterPresent}
-            doesExternalFilterPass={doesExternalFilterPass}
-            rowGroupPanelShow="always"
-            pivotPanelShow="always"
-            groupDisplayType="singleColumn"
-            getRowId={(p) => p.data.id}
-          />
-        </div>
+        {/* Grid (desktop / tablet) — Card list (mobile) */}
+        {isMobile ? (
+          <div
+            className="w-full rounded-md border border-border/60 vrd-ag-grid bg-background overflow-y-auto"
+            style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
+            role="list"
+            aria-label="Vulnerabilities"
+          >
+            {cardVulns.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground p-6 text-center">
+                No vulnerabilities match the current filters.
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 p-3">
+                {cardVulns.map((v) => (
+                  <VulnerabilityCard
+                    key={v.id}
+                    vulnerability={v}
+                    onClick={onRowSelected}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className="ag-theme-quartz w-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid"
+            style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
+          >
+            <AgGridReact<Vulnerability>
+              ref={gridRef}
+              rowData={vulnerabilities}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              onGridReady={onGridReady}
+              onGridSizeChanged={onGridSizeChanged}
+              onRowClicked={onRowClicked}
+              onSelectionChanged={onSelectionChanged}
+              rowSelection={{
+                mode: "multiRow",
+                checkboxes: true,
+                headerCheckbox: true,
+                enableClickSelection: false,
+              }}
+              suppressRowClickSelection={true}
+              suppressHorizontalScroll={isTablet}
+              enableRangeSelection={true}
+              enableCharts={true}
+              cellSelection={true}
+              pagination={true}
+              paginationPageSize={50}
+              paginationPageSizeSelector={[25, 50, 100, 200]}
+              animateRows={true}
+              enableCellTextSelection={true}
+              suppressMenuHide={false}
+              tooltipShowDelay={500}
+              floatingFiltersHeight={36}
+              headerHeight={40}
+              rowHeight={rowHeight}
+              sideBar={sideBar}
+              statusBar={statusBar}
+              getContextMenuItems={getContextMenuItems}
+              isExternalFilterPresent={isExternalFilterPresent}
+              doesExternalFilterPass={doesExternalFilterPass}
+              rowGroupPanelShow="always"
+              pivotPanelShow="always"
+              groupDisplayType="singleColumn"
+              getRowId={(p) => p.data.id}
+            />
+          </div>
+        )}
       </div>
 
       {/* Detail Sheet */}

@@ -38,6 +38,7 @@ import { BlockersStrip } from "@/components/dashboard/blockers-strip";
 import { mockVulnerabilities, CIO_TEAMS } from "@/lib/mock-data";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
+import { useViewport } from "@/lib/use-viewport";
 import {
   DASHBOARD_STATS,
   SOURCE_CHART_OPEN,
@@ -133,30 +134,6 @@ const KEYFRAMES = `
     .src-dashboard button, .src-dashboard [role="button"] { min-height: 36px; }
   }
 `;
-
-// ── Viewport hook ──────────────────────────────────────────────────────────────
-type Viewport = "mobile" | "tablet" | "desktop";
-
-function useViewport(): Viewport {
-  // Default to "desktop" on first render so SSR markup matches a desktop client.
-  // The effect re-evaluates on the client and re-renders if needed.
-  const [viewport, setViewport] = useState<Viewport>("desktop");
-
-  useEffect(() => {
-    const compute = (): Viewport => {
-      const w = window.innerWidth;
-      if (w < 768) return "mobile";
-      if (w < 1024) return "tablet";
-      return "desktop";
-    };
-    const onResize = () => setViewport(compute());
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  return viewport;
-}
 
 // ── Shared shadow / radius tokens ──────────────────────────────────────────────
 
