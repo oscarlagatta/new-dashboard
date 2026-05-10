@@ -185,12 +185,12 @@ function BulkActionBar({
       aria-label="Bulk actions"
       aria-live="polite"
     >
-      <div className="mx-6 mb-4">
-        <div className="bg-zinc-900 text-white rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
+      <div className="mx-3 sm:mx-6 mb-3 sm:mb-4" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="bg-zinc-900 text-white rounded-lg shadow-xl px-3 sm:px-4 py-3 flex flex-wrap items-center gap-2 sm:gap-4">
           <span className="text-sm font-medium flex-shrink-0">
             {selectedCount} row{selectedCount !== 1 ? "s" : ""} selected
           </span>
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex items-center gap-2 flex-1 flex-wrap min-w-0">
             {/* Assign Owner */}
             <Popover open={ownerOpen} onOpenChange={setOwnerOpen}>
               <PopoverTrigger asChild>
@@ -1007,8 +1007,8 @@ export function AgGridTriageTable({
 
         {/* AG Grid */}
         <div
-          className="ag-theme-quartz w-full rounded-md overflow-hidden border border-border/60"
-          style={{ height: "calc(100vh - 240px)", minHeight: 420 }}
+          className="ag-theme-quartz w-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid"
+          style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
         >
           <AgGridReact<Vulnerability>
             ref={gridRef}

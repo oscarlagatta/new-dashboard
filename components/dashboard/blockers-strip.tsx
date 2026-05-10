@@ -59,6 +59,7 @@ export function BlockersStrip({ vulnerabilities, onSelectBlocker }: BlockersStri
 
   return (
     <div
+      className="vrd-blockers-strip"
       style={{
         background: "#FFFFFF",
         borderRadius: 16,
