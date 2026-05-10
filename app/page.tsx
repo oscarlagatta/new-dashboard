@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ShieldCheck,
   LayoutDashboard,
@@ -24,6 +24,8 @@ import {
   TrendingUp,
   PanelLeftClose,
   PanelLeftOpen,
+  Menu,
+  X as XIcon,
 } from "lucide-react";
 import {
   Popover,
@@ -47,7 +49,9 @@ import {
   DAYS_OPEN_DATA,
 } from "@/lib/executive-data";
 
-// ── Animations ─────────────────────────────────────────────────────────────────
+// ── Animations & responsive rules ──────────────────────────────────────────────
+// All styles scoped under `.src-dashboard` so they don't leak when this app is
+// embedded inside another monorepo's global stylesheet.
 
 const KEYFRAMES = `
   @keyframes fadeSlideUp {
@@ -58,18 +62,101 @@ const KEYFRAMES = `
     from { transform: scaleX(0); }
     to   { transform: scaleX(1); }
   }
-@keyframes fadeIn {
+  @keyframes fadeIn {
     from { opacity: 0; }
     to   { opacity: 1; }
   }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
+    .src-dashboard *, .src-dashboard *::before, .src-dashboard *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
   }
+
+  /* ── Responsive: tablet & below (≤1023px) ──────────────────────────────── */
+  @media (max-width: 1023px) {
+    /* Release flex:1 constraints so cards take natural height and the
+       content-area scroll absorbs overflow. Without this, stacked chart
+       cards squash and visually overlap each other. */
+    .src-dashboard .vrd-page-content { flex: 0 0 auto !important; min-height: 0 !important; }
+    .src-dashboard .vrd-charts-row { flex: 0 0 auto !important; min-height: 0 !important; flex-direction: column !important; }
+    .src-dashboard .vrd-chart-card { flex: 0 0 auto !important; width: 100% !important; height: auto !important; min-height: 360px !important; }
+    .src-dashboard .vrd-stat-row { flex-wrap: wrap !important; flex: 0 0 auto !important; }
+    .src-dashboard .vrd-stat-card { flex: 1 1 calc(50% - 6px) !important; min-width: 0 !important; }
+    .src-dashboard .vrd-main-content { flex: 0 0 auto !important; min-height: 0 !important; }
+    .src-dashboard .vrd-content-area { padding: 12px 14px !important; margin-left: 0 !important; }
+    .src-dashboard .vrd-header-title { font-size: 17px !important; }
+    .src-dashboard .vrd-header-cio-name { display: none !important; }
+    .src-dashboard .vrd-header-cio-btn { padding: 6px !important; }
+    .src-dashboard .vrd-header-cio-chevron { display: none !important; }
+  }
+
+  /* ── Responsive: phone (≤767px) ────────────────────────────────────────── */
+  @media (max-width: 767px) {
+    .src-dashboard .vrd-stat-card { flex: 1 1 100% !important; min-height: 110px !important; }
+    .src-dashboard .vrd-chart-toolbar { flex-wrap: wrap !important; gap: 6px !important; }
+    .src-dashboard .vrd-chart-toolbar > * { flex-shrink: 0; }
+    .src-dashboard .vrd-chart-title { font-size: 14px !important; }
+    .src-dashboard .vrd-chart-summary { gap: 18px !important; }
+    .src-dashboard .vrd-chart-summary-num { font-size: 24px !important; }
+    .src-dashboard .vrd-page-content { gap: 8px !important; }
+    .src-dashboard .vrd-content-area { padding: 10px !important; gap: 10px !important; }
+    .src-dashboard .vrd-header-meta { font-size: 12px !important; gap: 8px !important; }
+    .src-dashboard .vrd-header-meta-dot { display: none !important; }
+    .src-dashboard .vrd-header-meta-dept { display: none !important; }
+    .src-dashboard .vrd-header-search-btn { display: none !important; }
+    .src-dashboard .vrd-header-actions { gap: 4px !important; }
+    .src-dashboard .vrd-blockers-strip { padding: 12px 14px !important; }
+    .src-dashboard .vrd-vuln-page-header { padding: 12px 14px !important; }
+    .src-dashboard .vrd-vuln-page-body { padding: 10px 12px 14px !important; }
+    .src-dashboard .vrd-vuln-page-card { border-radius: 12px !important; }
+  }
+
+  /* Block horizontal scroll on the host page when sidebar drawer is open */
+  .src-dashboard.vrd-drawer-open { overflow: hidden !important; }
+
+  /* AG Grid resizes its own height; ensure the wrapper doesn't blow past viewport */
+  @media (max-width: 1023px) {
+    .src-dashboard .vrd-ag-grid { height: min(calc(100dvh - 320px), 70vh) !important; }
+  }
+  @media (max-width: 767px) {
+    .src-dashboard .vrd-ag-grid { height: min(calc(100dvh - 360px), 65vh) !important; min-height: 320px !important; }
+  }
+
+  /* Prevent horizontal page scroll caused by very wide content */
+  .src-dashboard { overflow-x: hidden; }
+
+  /* Touch target hardening — make all buttons within tappable */
+  @media (hover: none) and (pointer: coarse) {
+    .src-dashboard button { -webkit-tap-highlight-color: transparent; }
+    .src-dashboard button, .src-dashboard [role="button"] { min-height: 36px; }
+  }
 `;
+
+// ── Viewport hook ──────────────────────────────────────────────────────────────
+type Viewport = "mobile" | "tablet" | "desktop";
+
+function useViewport(): Viewport {
+  // Default to "desktop" on first render so SSR markup matches a desktop client.
+  // The effect re-evaluates on the client and re-renders if needed.
+  const [viewport, setViewport] = useState<Viewport>("desktop");
+
+  useEffect(() => {
+    const compute = (): Viewport => {
+      const w = window.innerWidth;
+      if (w < 768) return "mobile";
+      if (w < 1024) return "tablet";
+      return "desktop";
+    };
+    const onResize = () => setViewport(compute());
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return viewport;
+}
 
 // ── Shared shadow / radius tokens ──────────────────────────────────────────────
 
@@ -107,6 +194,10 @@ interface SidebarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
   onToggle: () => void;
+  /** "fixed" = desktop docked sidebar; "drawer" = off-canvas mobile/tablet drawer. */
+  mode: "fixed" | "drawer";
+  drawerOpen: boolean;
+  onDrawerClose: () => void;
 }
 
 const NAV_ITEMS = [
@@ -117,14 +208,55 @@ const NAV_ITEMS = [
   { id: "_settings", label: "Settings", Icon: Settings },
 ];
 
-function Sidebar({ collapsed, activePage, onNavigate, onToggle }: SidebarProps) {
-  return (
-    <nav
-      style={{
+function Sidebar({
+  collapsed,
+  activePage,
+  onNavigate,
+  onToggle,
+  mode,
+  drawerOpen,
+  onDrawerClose,
+}: SidebarProps) {
+  const isDrawer = mode === "drawer";
+  // In drawer mode the sidebar is always visually expanded (collapsed prop is ignored).
+  const visualCollapsed = isDrawer ? false : collapsed;
+
+  // Close drawer on Escape
+  useEffect(() => {
+    if (!isDrawer || !drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onDrawerClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [isDrawer, drawerOpen, onDrawerClose]);
+
+  const drawerWidth = 280;
+
+  const navStyle: React.CSSProperties = isDrawer
+    ? {
+        position: "fixed",
+        left: 0,
+        top: 0,
+        width: drawerWidth,
+        maxWidth: "85vw",
+        height: "100dvh",
+        background: "#FFFFFF",
+        borderRadius: 0,
+        boxShadow: "0 12px 32px rgba(0,0,0,0.18)",
+        zIndex: 60,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        transform: drawerOpen ? "translateX(0)" : `translateX(-${drawerWidth + 20}px)`,
+        transition: "transform 240ms cubic-bezier(.2,.8,.2,1)",
+        visibility: drawerOpen ? "visible" : "hidden",
+      }
+    : {
         position: "fixed",
         left: 20,
         top: 20,
-        width: collapsed ? 104 : 354,
+        width: visualCollapsed ? 104 : 354,
         height: "calc(100vh - 40px)",
         background: "#FFFFFF",
         borderRadius: 16,
@@ -134,45 +266,87 @@ function Sidebar({ collapsed, activePage, onNavigate, onToggle }: SidebarProps) 
         flexDirection: "column",
         transition: "width 250ms ease",
         overflow: "hidden",
-      }}
-      aria-label="Main navigation"
-    >
+      };
+
+  return (
+    <>
+      {isDrawer && drawerOpen && (
+        <div
+          onClick={onDrawerClose}
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 55,
+            animation: "fadeIn 180ms ease",
+          }}
+        />
+      )}
+      <nav
+        style={navStyle}
+        aria-label="Main navigation"
+        aria-hidden={isDrawer && !drawerOpen}
+      >
       {/* Branding */}
       <div
         style={{
-          padding: collapsed ? "20px 0 8px" : "20px 20px 8px",
+          padding: visualCollapsed ? "20px 0 8px" : "20px 20px 8px",
           display: "flex",
           alignItems: "center",
           gap: 10,
-          justifyContent: collapsed ? "center" : "flex-start",
+          justifyContent: visualCollapsed ? "center" : "space-between",
           borderBottom: "1px solid #F3F4F6",
           marginBottom: 8,
           flexShrink: 0,
         }}
       >
-        <ShieldCheck
-          style={{ width: 24, height: 24, color: "#2563EB", flexShrink: 0 }}
-          aria-hidden="true"
-        />
-        {!collapsed && (
-          <span
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <ShieldCheck
+            style={{ width: 24, height: 24, color: "#2563EB", flexShrink: 0 }}
+            aria-hidden="true"
+          />
+          {!visualCollapsed && (
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 14,
+                color: "#111827",
+                whiteSpace: "nowrap",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                lineHeight: 1,
+              }}
+            >
+              Vulnerability Remediation
+            </span>
+          )}
+        </div>
+        {isDrawer && (
+          <button
+            onClick={onDrawerClose}
+            aria-label="Close navigation"
             style={{
-              fontWeight: 700,
-              fontSize: 14,
-              color: "#111827",
-              whiteSpace: "nowrap",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              lineHeight: 1,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border: "none",
+              background: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              color: "#6B7280",
+              flexShrink: 0,
             }}
           >
-            Vulnerability Remediation
-          </span>
+            <XIcon style={{ width: 18, height: 18 }} aria-hidden="true" />
+          </button>
         )}
       </div>
 
       {/* MENU label */}
-      {!collapsed && (
+      {!visualCollapsed && (
         <div
           style={{
             margin: "16px 16px 8px",
@@ -189,7 +363,7 @@ function Sidebar({ collapsed, activePage, onNavigate, onToggle }: SidebarProps) 
       )}
 
       {/* Nav items */}
-      <div style={{ flex: 1, overflow: "hidden", padding: collapsed ? "0 4px" : "0" }}>
+      <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: visualCollapsed ? "0 4px" : "0" }}>
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const isNavigable = id === "dashboard" || id === "vulnerabilities";
           const isActive = isNavigable && id === activePage;
@@ -200,63 +374,69 @@ function Sidebar({ collapsed, activePage, onNavigate, onToggle }: SidebarProps) 
               label={label}
               Icon={Icon}
               isActive={isActive}
-              collapsed={collapsed}
+              collapsed={visualCollapsed}
               disabled={!isNavigable}
-              onClick={() => isNavigable && onNavigate(id as Page)}
+              onClick={() => {
+                if (!isNavigable) return;
+                onNavigate(id as Page);
+                if (isDrawer) onDrawerClose();
+              }}
             />
           );
         })}
       </div>
 
-      {/* Collapse / expand toggle — pinned at bottom */}
-      <div
-        style={{
-          borderTop: "1px solid #F3F4F6",
-          padding: collapsed ? "8px 4px" : "8px 12px",
-          flexShrink: 0,
-        }}
-      >
-        <button
-          onClick={onToggle}
+      {/* Collapse / expand toggle — pinned at bottom (desktop only) */}
+      {!isDrawer && (
+        <div
           style={{
-            width: "100%",
-            height: 44,
-            borderRadius: 10,
-            border: "none",
-            background: "transparent",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            gap: 10,
-            padding: collapsed ? 0 : "0 4px",
-            cursor: "pointer",
-            color: "#9CA3AF",
-            fontSize: 14,
-            fontWeight: 500,
-            transition: "background 100ms, color 100ms",
+            borderTop: "1px solid #F3F4F6",
+            padding: visualCollapsed ? "8px 4px" : "8px 12px",
+            flexShrink: 0,
           }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB";
-            (e.currentTarget as HTMLButtonElement).style.color = "#374151";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-            (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF";
-          }}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? (
-            <PanelLeftOpen style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-          ) : (
-            <>
-              <PanelLeftClose style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-              <span>Collapse</span>
-            </>
-          )}
-        </button>
-      </div>
-
-    </nav>
+          <button
+            onClick={onToggle}
+            style={{
+              width: "100%",
+              height: 44,
+              borderRadius: 10,
+              border: "none",
+              background: "transparent",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: visualCollapsed ? "center" : "flex-start",
+              gap: 10,
+              padding: visualCollapsed ? 0 : "0 4px",
+              cursor: "pointer",
+              color: "#9CA3AF",
+              fontSize: 14,
+              fontWeight: 500,
+              transition: "background 100ms, color 100ms",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "#F9FAFB";
+              (e.currentTarget as HTMLButtonElement).style.color = "#374151";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              (e.currentTarget as HTMLButtonElement).style.color = "#9CA3AF";
+            }}
+            aria-label={visualCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {visualCollapsed ? (
+              <PanelLeftOpen style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
+            ) : (
+              <>
+                <PanelLeftClose style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
+                <span>Collapse</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+      </nav>
+    </>
   );
 }
 
@@ -338,9 +518,18 @@ interface HeaderCardProps {
   onSelectCio: (cio: (typeof CIO_TEAMS)[0]) => void;
   stats: HeaderStats;
   onNavigate: (page: Page) => void;
+  showMenuButton: boolean;
+  onMenuClick: () => void;
 }
 
-function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardProps) {
+function HeaderCard({
+  selectedCio,
+  onSelectCio,
+  stats,
+  onNavigate,
+  showMenuButton,
+  onMenuClick,
+}: HeaderCardProps) {
   const [cioOpen, setCioOpen] = useState(false);
   const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
   const initials = getInitials(selectedCio.name);
@@ -357,40 +546,69 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 16,
+        gap: 12,
         flexShrink: 0,
       }}
     >
-      {/* Left: title (recessed) + meta-row (promoted) */}
-      <div style={{ minWidth: 0 }}>
-        <h1
-          style={{
-            fontSize: 20,
-            fontWeight: 600,
-            color: "#111827",
-            lineHeight: 1.2,
-            margin: 0,
-            whiteSpace: "nowrap",
-          }}
-        >
-          Security Risk Console
-        </h1>
-        <div style={{ marginTop: 4 }}>
-          <MetaRow
-            stats={stats}
-            department={department}
-            onNavigate={onNavigate}
-          />
+      {/* Left: hamburger (mobile) + title + meta-row */}
+      <div style={{ minWidth: 0, flex: 1, display: "flex", alignItems: "center", gap: 10 }}>
+        {showMenuButton && (
+          <button
+            onClick={onMenuClick}
+            aria-label="Open navigation menu"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              background: "#FFFFFF",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              color: "#374151",
+            }}
+          >
+            <Menu style={{ width: 20, height: 20 }} aria-hidden="true" />
+          </button>
+        )}
+        <div style={{ minWidth: 0 }}>
+          <h1
+            className="vrd-header-title"
+            style={{
+              fontSize: 20,
+              fontWeight: 600,
+              color: "#111827",
+              lineHeight: 1.2,
+              margin: 0,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            Security Risk Console
+          </h1>
+          <div style={{ marginTop: 4 }}>
+            <MetaRow
+              stats={stats}
+              department={department}
+              onNavigate={onNavigate}
+            />
+          </div>
         </div>
       </div>
 
       {/* Right: search + bell + CIO */}
       <div
+        className="vrd-header-actions"
         style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
       >
-        <IconCircleBtn aria-label="Search">
-          <Search style={{ width: 17, height: 17, color: "#6B7280" }} />
-        </IconCircleBtn>
+        <span className="vrd-header-search-btn" style={{ display: "inline-flex" }}>
+          <IconCircleBtn aria-label="Search">
+            <Search style={{ width: 17, height: 17, color: "#6B7280" }} />
+          </IconCircleBtn>
+        </span>
 
         <div style={{ position: "relative" }}>
           <IconCircleBtn aria-label={`${formatCount(stats.priority1)} notifications`}>
@@ -425,6 +643,7 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
         <Popover open={cioOpen} onOpenChange={setCioOpen}>
           <PopoverTrigger asChild>
             <button
+              className="vrd-header-cio-btn"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -442,10 +661,11 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLButtonElement).style.background = "#FAFAFA")
               }
-              aria-label="Select CIO team"
+              aria-label={`Select CIO team. Current: ${selectedCio.name}`}
             >
               <Avatar initials={initials} size={32} />
               <span
+                className="vrd-header-cio-name"
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
@@ -456,6 +676,7 @@ function HeaderCard({ selectedCio, onSelectCio, stats, onNavigate }: HeaderCardP
                 CIO: {selectedCio.name}
               </span>
               <ChevronDown
+                className="vrd-header-cio-chevron"
                 style={{ width: 14, height: 14, color: "#9CA3AF" }}
                 aria-hidden="true"
               />
@@ -576,6 +797,7 @@ function MetaRow({
 
   return (
     <div
+      className="vrd-header-meta"
       style={{
         display: "flex",
         alignItems: "center",
@@ -591,22 +813,22 @@ function MetaRow({
         label="vulnerabilities"
         onClick={() => onNavigate("vulnerabilities")}
       />
-      <span style={dotStyle} aria-hidden="true" />
+      <span className="vrd-header-meta-dot" style={dotStyle} aria-hidden="true" />
       <MetaItem
         value={formatCount(stats.overdue)}
         label="overdue"
         valueColor="#DC2626"
         onClick={() => onNavigate("vulnerabilities")}
       />
-      <span style={dotStyle} aria-hidden="true" />
+      <span className="vrd-header-meta-dot" style={dotStyle} aria-hidden="true" />
       <MetaItem
         value={formatCount(stats.priority1)}
         label="Priority 1"
         valueColor="#DC2626"
         onClick={() => onNavigate("vulnerabilities")}
       />
-      <span style={dotStyle} aria-hidden="true" />
-      <span style={{ color: "#6B7280" }}>{department}</span>
+      <span className="vrd-header-meta-dot" style={dotStyle} aria-hidden="true" />
+      <span className="vrd-header-meta-dept" style={{ color: "#6B7280" }}>{department}</span>
     </div>
   );
 }
@@ -691,6 +913,7 @@ function StatCard({
 
   return (
     <div
+      className="vrd-stat-card"
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
       aria-label={clickable ? `View ${label}` : undefined}
@@ -940,9 +1163,10 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }} aria-label="Dashboard">
+    <div className="vrd-page-content" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }} aria-label="Dashboard">
       {/* Stat cards */}
       <section
+        className="vrd-stat-row"
         style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "stretch" }}
         aria-label="Summary statistics"
       >
@@ -958,22 +1182,26 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
 
       {/* Charts row */}
       <section
+        className="vrd-charts-row"
         style={{ display: "flex", gap: 12, alignItems: "stretch", marginBottom: 10, flex: 1, minHeight: 0 }}
         aria-label="Data visualizations"
       >
         {/* Left: Source bar chart (60%) */}
         <div
+          className="vrd-chart-card"
           style={{ flex: "0 0 60%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}
         >
           <div
+            className="vrd-chart-toolbar"
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 10,
+              gap: 8,
             }}
           >
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
                 <BarChart3 style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
@@ -981,7 +1209,7 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
                 {DIMENSION_TITLES[dimension]}
               </span>
             </span>
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
               {/* Dimension toggle */}
               <div
                 style={{
@@ -1063,9 +1291,10 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
           </div>
 
           {/* Summary numbers */}
-          <div style={{ display: "flex", gap: 28, marginBottom: 4 }}>
+          <div className="vrd-chart-summary" style={{ display: "flex", gap: 28, marginBottom: 4, flexWrap: "wrap" }}>
             <div>
               <div
+                className="vrd-chart-summary-num"
                 style={{
                   fontSize: 30,
                   fontWeight: 800,
@@ -1085,6 +1314,7 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
             </div>
             <div>
               <div
+                className="vrd-chart-summary-num"
                 style={{
                   fontSize: 30,
                   fontWeight: 800,
@@ -1115,6 +1345,7 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
 
         {/* Right: Days Open donut (40% minus gap) */}
         <div
+          className="vrd-chart-card"
           style={{
             flex: "0 0 calc(40% - 6px)",
             ...cardStyle,
@@ -1126,14 +1357,16 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
           }}
         >
           <div
+            className="vrd-chart-toolbar"
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 4,
+              gap: 8,
             }}
           >
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
                 <Clock style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
@@ -1166,20 +1399,23 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
 
       {/* Second charts row — Remediation Trend + SLA Compliance */}
       <section
+        className="vrd-charts-row"
         style={{ display: "flex", gap: 12, alignItems: "stretch", flex: 1, minHeight: 0 }}
         aria-label="Trend and SLA analytics"
       >
         {/* Remediation Trend */}
-        <div style={{ flex: "0 0 55%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div className="vrd-chart-card" style={{ flex: "0 0 55%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
+            className="vrd-chart-toolbar"
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 8,
+              gap: 8,
             }}
           >
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
                 <TrendingUp style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
@@ -1193,16 +1429,18 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
         </div>
 
         {/* SLA Compliance */}
-        <div style={{ flex: "0 0 calc(45% - 6px)", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div className="vrd-chart-card" style={{ flex: "0 0 calc(45% - 6px)", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
           <div
+            className="vrd-chart-toolbar"
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 10,
+              gap: 8,
             }}
           >
-            <span style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
               <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
                 <CheckCircle2 style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
               </div>
@@ -1247,6 +1485,7 @@ function VulnerabilitiesPage({
 
   return (
     <div
+      className="vrd-vuln-page-card"
       style={{
         background: "#fff",
         borderRadius: CARD_RADIUS,
@@ -1259,6 +1498,7 @@ function VulnerabilitiesPage({
     >
       {/* Slim inner header */}
       <div
+        className="vrd-vuln-page-header"
         style={{
           padding: "16px 20px",
           borderBottom: "1px solid #F3F4F6",
@@ -1282,7 +1522,7 @@ function VulnerabilitiesPage({
       </div>
 
       {/* Toolbar + grid */}
-      <div style={{ padding: "14px 20px 20px" }}>
+      <div className="vrd-vuln-page-body" style={{ padding: "14px 20px 20px" }}>
         <AgGridTriageTable
           vulnerabilities={vulnerabilities}
           onRowSelected={onRowSelected}
@@ -1301,13 +1541,31 @@ function VulnerabilitiesPage({
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCio, setSelectedCio] = useState(CIO_TEAMS[0]!);
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
+  const viewport = useViewport();
+  const isCompact = viewport !== "desktop"; // mobile + tablet share the drawer treatment
+
+  // Auto-close the drawer if the viewport grows back to desktop, so state stays clean.
+  useEffect(() => {
+    if (!isCompact && drawerOpen) setDrawerOpen(false);
+  }, [isCompact, drawerOpen]);
+
+  // Lock the underlying scroll when drawer is open (mobile UX).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.querySelector<HTMLDivElement>(".src-dashboard");
+    if (!root) return;
+    if (drawerOpen) root.classList.add("vrd-drawer-open");
+    else root.classList.remove("vrd-drawer-open");
+  }, [drawerOpen]);
+
   const sidebarWidth = isSidebarCollapsed ? 104 : 354;
-  // 20px left offset + sidebar width + 20px gap before content
-  const contentMarginLeft = 20 + sidebarWidth + 20;
+  // Desktop only: 20px left offset + sidebar width + 20px gap before content.
+  const contentMarginLeft = isCompact ? 0 : 20 + sidebarWidth + 20;
 
   const stats = DASHBOARD_STATS;
 
@@ -1324,21 +1582,26 @@ export default function App() {
     <>
       <style>{KEYFRAMES}</style>
 
-      {/* Fixed sidebar */}
+      {/* Sidebar — fixed on desktop, off-canvas drawer below 1024px */}
       <Sidebar
         collapsed={isSidebarCollapsed}
         activePage={currentPage}
         onNavigate={onNavigate}
         onToggle={() => setIsSidebarCollapsed((v) => !v)}
+        mode={isCompact ? "drawer" : "fixed"}
+        drawerOpen={drawerOpen}
+        onDrawerClose={() => setDrawerOpen(false)}
       />
 
       {/* Scrollable content area */}
       <div
+        className="vrd-content-area"
         style={{
           marginLeft: contentMarginLeft,
           transition: "margin-left 250ms ease",
-          height: "100vh",
+          height: "100dvh",
           overflowY: "auto",
+          overflowX: "hidden",
           background: "#F7F8FA",
           fontFamily: "var(--font-dm-sans), system-ui, sans-serif",
           display: "flex",
@@ -1353,11 +1616,14 @@ export default function App() {
           onSelectCio={setSelectedCio}
           stats={stats}
           onNavigate={onNavigate}
+          showMenuButton={isCompact}
+          onMenuClick={() => setDrawerOpen(true)}
         />
 
         {/* Page content */}
         <main
           id="main-content"
+          className="vrd-main-content"
           tabIndex={-1}
           style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
         >

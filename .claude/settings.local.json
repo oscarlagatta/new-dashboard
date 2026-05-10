@@ -38,7 +38,8 @@
       "Bash(npm *)",
       "PowerShell(Start-Process -FilePath \"npm\" -ArgumentList \"run\", \"dev\" -WorkingDirectory \"D:\\\\sandbox\\\\new-dashboard\" -NoNewWindow; Start-Sleep -Seconds 6; try { \\(Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 8\\).StatusCode } catch { \"Server not ready: $_\" })",
       "Bash(curl *)",
-      "Bash(dir *)"
+      "Bash(dir *)",
+      "Bash(findstr /C:\"app/page.tsx\" /C:\"detail-sheet.tsx\" /C:\"ag-grid-table.tsx\" /C:\"blockers-strip.tsx\")"
     ]
   }
 }
