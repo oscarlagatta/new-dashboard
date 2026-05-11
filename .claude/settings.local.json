@@ -42,7 +42,8 @@
       "Bash(findstr /C:\"app/page.tsx\" /C:\"detail-sheet.tsx\" /C:\"ag-grid-table.tsx\" /C:\"blockers-strip.tsx\")",
       "mcp__ag-mcp__detect_version",
       "mcp__ag-mcp__search_docs",
-      "Bash(tee /tmp/tsc-out.txt)"
+      "Bash(tee /tmp/tsc-out.txt)",
+      "Bash(npx eslint *)"
     ]
   }
 }
