@@ -1,0 +1,20 @@
+{
+  "name": "vuln-dashboard",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/vuln-dashboard/src",
+  "projectType": "library",
+  "tags": [],
+  "// note": "Non-buildable library. No `build` target — the host app's Webpack compiles src/ directly. Add lint/test targets that match your workspace conventions.",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "libs/vuln-dashboard/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  }
+}
