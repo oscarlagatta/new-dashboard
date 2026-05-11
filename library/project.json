@@ -1,10 +1,10 @@
 {
-  "name": "vuln-dashboard",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "libs/vuln-dashboard/src",
+  "name": "feature-vulnerability-remediation",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/vulnerability-management/features/feature-vulnerability-remediation/src",
   "projectType": "library",
-  "tags": [],
-  "// note": "Non-buildable library. No `build` target — the host app's Webpack compiles src/ directly. Add lint/test targets that match your workspace conventions.",
+  "tags": ["scope:vulnerability-management", "type:feature"],
+  "// note": "Non-buildable feature library inside the `bpsappreact` Nx workspace. The host app `apps/bps-hub` routes to <ExecutiveDashboard /> from this library. No `build` target — host Webpack compiles src/ directly. When sibling libs (ui/hooks/utils) are extracted under `libs/vulnerability-management/`, update the imports inside src/lib/ to consume them instead of the in-feature copies.",
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint"
@@ -12,7 +12,7 @@
     "test": {
       "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "libs/vuln-dashboard/jest.config.ts",
+        "jestConfig": "libs/vulnerability-management/features/feature-vulnerability-remediation/jest.config.ts",
         "passWithNoTests": true
       }
     }

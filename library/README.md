@@ -1,83 +1,94 @@
-# @my-org/vuln-dashboard
+# @my-org/feature-vulnerability-remediation
 
-A React library that ships the vulnerability remediation executive dashboard. Designed as a **non-buildable Nx library** consumed as TypeScript source by a host React app built with **Webpack 5**.
+A React feature library that ships the vulnerability remediation executive dashboard. Designed as a **non-buildable Nx feature library** consumed as TypeScript source by the **`bps-hub`** application inside the **`bpsappreact`** Nx workspace, built with **Webpack 5**.
 
-This directory mirrors `libs/vuln-dashboard/` in your Nx workspace. Drop `src/`, `package.json`, `project.json`, and `tsconfig.json` into place and you're done.
+This directory mirrors `libs/vulnerability-management/features/feature-vulnerability-remediation/` in your Nx workspace. Drop `src/`, `package.json`, `project.json`, and `tsconfig.json` into place and you're done.
+
+> **Domain folder**: I used `vulnerability-management` as the domain under `libs/`. This is where sibling libraries (`ui`, `hooks`, `utils`, `presenters`) will live when extracted later. For now, this feature is self-contained — it ships its own copy of shadcn/ui primitives, hooks, and helpers inside `src/lib/`.
 
 ---
 
-## Library shape
+## Where this library lives
 
 ```
-libs/vuln-dashboard/
-├── package.json                 # name + version only (private, no main/module)
-├── project.json                 # Nx project metadata (lint + test targets, NO build)
-├── tsconfig.json                # extends workspace tsconfig.base.json
-├── README.md                    # this file
-├── scripts/
-│   └── copy-sources.mjs         # re-sync from the original Next.js source
-└── src/
-    ├── index.ts                 # public API
-    └── lib/
-        ├── executive-dashboard.tsx   # top-level component
-        ├── configure-dashboard.ts    # license-key setup (call once at host startup)
-        ├── resize-observer-fix.tsx   # silences AG Grid's harmless ResizeObserver console error
-        ├── components/               # all dashboard + shadcn primitives (verbatim from sandbox)
-        ├── hooks/
-        └── lib/                      # comparators, mocks, types, helpers, saved-views logic
+bpsappreact/                                                ← Nx workspace root
+├── apps/
+│   └── bps-hub/                                            ← existing host app; will add a route mounting <ExecutiveDashboard />
+└── libs/
+    └── vulnerability-management/                           ← domain folder
+        └── features/
+            └── feature-vulnerability-remediation/          ← THIS library
+                ├── package.json                            # name + version only (private)
+                ├── project.json                            # Nx metadata: lint + test, NO build
+                ├── tsconfig.json                           # extends workspace tsconfig.base.json
+                ├── README.md                               # this file
+                ├── scripts/
+                │   └── copy-sources.mjs                    # re-sync from the original Next.js source
+                └── src/
+                    ├── index.ts                            # public API
+                    └── lib/
+                        ├── executive-dashboard.tsx         # top-level component
+                        ├── configure-dashboard.ts          # license-key setup (call once at host startup)
+                        ├── resize-observer-fix.tsx
+                        ├── components/                     # dashboard + shadcn primitives
+                        ├── hooks/
+                        └── lib/                            # comparators, mocks, types, helpers, saved-views
 ```
 
-**Zero CSS shipped.** The host already owns Tailwind v3 configuration, the shadcn color tokens (`primary`, `muted`, `border`, …), and the `:root` / `.dark` CSS variables. The dashboard's one extra base rule (`.src-dashboard * { border-color: var(--border); ... }`) is now injected at runtime via the component's existing `<style>` tag.
+**Zero CSS shipped.** `bps-hub` already owns Tailwind v3, the shadcn color tokens (`primary`, `muted`, `border`, …), and the `:root` / `.dark` CSS variables. The one dashboard-specific base rule (`.src-dashboard * { border-color: var(--border); … }`) is injected at runtime via the component's `<style>` tag.
 
 **Zero build step.** No Vite, no Rollup, no `dist/`. The host's Webpack 5 compiles `src/index.ts` along with the rest of the host's source.
+
+**Self-contained for now.** Until sibling libs (`libs/vulnerability-management/ui/`, `.../hooks/`, `.../utils/`) are extracted, all dependencies live inside this feature's `src/lib/`. When you extract them, rewrite the relative imports in this feature to import from `@my-org/vulnerability-management-ui`, `@my-org/vulnerability-management-hooks`, etc.
 
 ---
 
 ## Wiring into your Nx workspace
 
-### 1. Generate a non-buildable library scaffold
+### 1. Generate the feature library
 
 ```bash
-nx g @nx/react:library vuln-dashboard \
-  --directory=libs/vuln-dashboard \
+nx g @nx/react:library feature-vulnerability-remediation \
+  --directory=libs/vulnerability-management/features/feature-vulnerability-remediation \
   --bundler=none \
   --unitTestRunner=jest \
   --linter=eslint \
-  --importPath=@my-org/vuln-dashboard
+  --tags="scope:vulnerability-management,type:feature" \
+  --importPath=@my-org/feature-vulnerability-remediation
 ```
 
-`--bundler=none` is the critical flag — it skips Vite/Rollup config generation.
+`--bundler=none` is the critical flag — it skips Vite/Rollup config generation so the host's Webpack owns compilation.
 
 ### 2. Copy the deliverable into place
 
 ```bash
-rm -rf libs/vuln-dashboard/src
-cp -r path/to/new-dashboard/library/src      libs/vuln-dashboard/src
-cp     path/to/new-dashboard/library/scripts libs/vuln-dashboard/scripts -r
+rm -rf libs/vulnerability-management/features/feature-vulnerability-remediation/src
+cp -r path/to/new-dashboard/library/src     libs/vulnerability-management/features/feature-vulnerability-remediation/src
+cp -r path/to/new-dashboard/library/scripts libs/vulnerability-management/features/feature-vulnerability-remediation/scripts
 ```
 
-Keep the **Nx-generated** `package.json`, `project.json`, and `tsconfig.json` in `libs/vuln-dashboard/`. They're already wired into your workspace; the files in this directory are reference shapes only.
+Keep the **Nx-generated** `package.json`, `project.json`, and `tsconfig.json`. The matching files in this directory are reference shapes only — refer to them when adjusting the generated versions.
 
 ### 3. Workspace `tsconfig.base.json` path alias
 
-Verify (or add) the path alias mapping for the importPath:
+Verify (the generator should have done this; if not, add it):
 
 ```jsonc
-// tsconfig.base.json
+// tsconfig.base.json (workspace root)
 {
   "compilerOptions": {
     "paths": {
-      "@my-org/vuln-dashboard": ["libs/vuln-dashboard/src/index.ts"]
+      "@my-org/feature-vulnerability-remediation": [
+        "libs/vulnerability-management/features/feature-vulnerability-remediation/src/index.ts"
+      ]
     }
   }
 }
 ```
 
-The `nx g` command in step 1 should have done this automatically — double-check that it landed.
-
 ### 4. Webpack 5 resolves the alias automatically
 
-Standard Nx React workspaces use `@nx/webpack:webpack` (or `@nx/react:webpack`) which integrates `tsconfig-paths-webpack-plugin` under the hood — no manual webpack-config changes needed. If your host app uses a hand-rolled `webpack.config.js`, confirm it has:
+Standard Nx React workspaces use `@nx/webpack:webpack` (or `@nx/react:webpack`), which integrates `tsconfig-paths-webpack-plugin` under the hood — **no manual webpack-config changes**. If `bps-hub` uses a hand-rolled `webpack.config.js`, confirm it has:
 
 ```js
 const { TsconfigPathsPlugin } = require('tsconfig-paths-webpack-plugin');
@@ -89,12 +100,12 @@ module.exports = {
 };
 ```
 
-### 5. Host Tailwind config — scan the library
+### 5. Host Tailwind config — scan the feature
 
-Your host app's Tailwind v3 config needs to scan the library's source so utility classes used inside the library (`bg-primary`, `text-muted-foreground`, `border-border`, etc.) actually get emitted:
+`apps/bps-hub`'s Tailwind v3 config needs to scan this library's source so utility classes used inside (`bg-primary`, `text-muted-foreground`, `border-border`, etc.) get emitted into the host's CSS bundle:
 
 ```ts
-// apps/your-host/tailwind.config.ts
+// apps/bps-hub/tailwind.config.ts
 import { createGlobPatternsForDependencies } from '@nx/react/tailwind';
 import { join } from 'node:path';
 
@@ -102,7 +113,8 @@ export default {
   content: [
     join(__dirname, 'src/**/*.{ts,tsx,html}'),
     // Auto-globs every Nx library this app depends on — picks up
-    // libs/vuln-dashboard/src/**/*.{ts,tsx} without explicit listing.
+    // libs/vulnerability-management/features/feature-vulnerability-remediation/src/**/*.{ts,tsx}
+    // without needing an explicit entry.
     ...createGlobPatternsForDependencies(__dirname),
   ],
   // ...rest of your existing config: theme, plugins, etc.
@@ -114,13 +126,13 @@ If you don't use `createGlobPatternsForDependencies`, add the path explicitly:
 ```ts
 content: [
   join(__dirname, 'src/**/*.{ts,tsx,html}'),
-  'libs/vuln-dashboard/src/**/*.{ts,tsx}',
+  'libs/vulnerability-management/features/feature-vulnerability-remediation/src/**/*.{ts,tsx}',
 ],
 ```
 
 ### 6. Add runtime dependencies to the workspace root `package.json`
 
-These were in the sandbox's `package.json`. Merge them into your root `package.json`:
+Merge these into the `bpsappreact` root `package.json`. Most are likely already there if other apps in the workspace are shadcn-based.
 
 ```jsonc
 {
@@ -178,13 +190,11 @@ These were in the sandbox's `package.json`. Merge them into your root `package.j
 }
 ```
 
-Most of these are likely already present if other apps in the workspace are shadcn-based.
-
-### 7. Mount the dashboard in a host app
+### 7. Mount the dashboard in `bps-hub`
 
 ```tsx
-// apps/console/src/main.tsx (or your existing entry point)
-import { configureDashboard } from '@my-org/vuln-dashboard';
+// apps/bps-hub/src/main.tsx (or existing entry point)
+import { configureDashboard } from '@my-org/feature-vulnerability-remediation';
 
 configureDashboard({
   agGridLicenseKey: process.env.NX_AG_GRID_LICENSE_KEY,
@@ -193,10 +203,13 @@ configureDashboard({
 ```
 
 ```tsx
-// any route component
-import { ExecutiveDashboard, ResizeObserverFix } from '@my-org/vuln-dashboard';
+// the route that handles the vulnerability remediation page in bps-hub's router
+import {
+  ExecutiveDashboard,
+  ResizeObserverFix,
+} from '@my-org/feature-vulnerability-remediation';
 
-export function DashboardRoute() {
+export function VulnerabilityRemediationRoute() {
   return (
     <div className="src-dashboard">
       <ResizeObserverFix />
@@ -208,15 +221,15 @@ export function DashboardRoute() {
 
 **Notes**:
 
-- `<ResizeObserverFix />` is optional. It silences the harmless `ResizeObserver loop completed with undelivered notifications` error AG Grid emits to the console. Mount it once anywhere in the tree.
-- The `.src-dashboard` wrapper is required — it scopes the dashboard's keyframe animations and border defaults so they don't leak into the rest of your host app.
-- No `import "@my-org/vuln-dashboard/styles.css"` is needed. The library doesn't ship a stylesheet. AG Grid's own CSS is side-effect-imported by the table component, so Webpack's CSS rule processes it automatically.
+- `<ResizeObserverFix />` is optional — it silences the harmless `ResizeObserver loop completed with undelivered notifications` error AG Grid emits to the console. Mount it once anywhere in the tree.
+- The `.src-dashboard` wrapper is **required** — it scopes the dashboard's keyframe animations and border defaults so they don't leak into the rest of `bps-hub`.
+- No `import` of any CSS file from this library is needed. AG Grid's own CSS is side-effect-imported by the table component, so Webpack's CSS rule processes it automatically.
 
 ---
 
 ## Required host Webpack CSS rule
 
-If your host already runs other shadcn-based apps, this is almost certainly in place. Otherwise verify the CSS rule handles `.css` imports from `node_modules` (needed for AG Grid):
+If other shadcn-based apps already build in this workspace, this is in place. Otherwise verify `bps-hub`'s CSS rule handles `.css` imports from `node_modules` (needed for AG Grid):
 
 ```js
 // webpack.config.js (rule snippet)
@@ -232,33 +245,33 @@ If your host already runs other shadcn-based apps, this is almost certainly in p
 
 ## Re-syncing from the original Next.js source
 
-`scripts/copy-sources.mjs` regenerates `src/lib/` from `../app/page.tsx` and the surrounding `components/`, `hooks/`, `lib/` directories of the parent Next.js sandbox. Run it whenever the sandbox is updated:
+`scripts/copy-sources.mjs` regenerates `src/lib/` from the parent Next.js sandbox (`app/page.tsx` plus surrounding `components/`, `hooks/`, `lib/`). Run it whenever the sandbox is updated:
 
 ```bash
-node libs/vuln-dashboard/scripts/copy-sources.mjs
+node libs/vulnerability-management/features/feature-vulnerability-remediation/scripts/copy-sources.mjs
 ```
 
 The script:
 
 - copies `components/`, `hooks/`, `lib/` into `src/lib/`
 - renames `app/page.tsx` → `executive-dashboard.tsx` (`App` → `ExecutiveDashboard`)
-- replaces the inline `var(--font-dm-sans)` style with a hint comment (font comes from host's `font-sans`)
+- replaces the inline `var(--font-dm-sans)` style with a hint comment
 - injects the `.src-dashboard *` border rule into the dashboard's `<style>` keyframes block
 - rewrites `lib/ag-grid-setup.ts` to drop env-var license reads (comparators only)
 - removes the side-effect import `import "@/lib/ag-grid-setup"` from `ag-grid-table.tsx`
 - converts `<style jsx>` → `<style>` (one occurrence in `sla-strip.tsx`)
 - strips every `"use client"` directive
 - **converts every `@/foo/bar` import to a relative path** — required because the host's Webpack doesn't know about the library's internal alias
-- removes six pre-existing dead-code legacy files that the dashboard never imported
+- removes six pre-existing dead-code legacy files
 
 Idempotent — overwrites the destination tree each run.
 
 ---
 
-## How the public API is structured
+## Public API
 
 ```ts
-// libs/vuln-dashboard/src/index.ts
+// src/index.ts
 export { configureDashboard } from './lib/configure-dashboard';
 export { ExecutiveDashboard }  from './lib/executive-dashboard';
 export { ResizeObserverFix }   from './lib/resize-observer-fix';
@@ -271,22 +284,38 @@ export type {
 } from './lib/lib/types';
 ```
 
-If you need to expose more components (e.g. `<VulnerabilitiesPage />` as a standalone), add named exports here — they're available as inner functions in `executive-dashboard.tsx`.
+If you need to expose more components (e.g. `<VulnerabilitiesPage />` as a standalone export), add named exports here — they're available as inner functions in `executive-dashboard.tsx`.
 
 ---
 
 ## Verification checklist
 
-1. **`nx lint vuln-dashboard`** — clean (or matches your workspace's normal warning level).
-2. **`nx typecheck vuln-dashboard`** — no errors. The Nx React TypeScript plugin should pick up the library automatically.
-3. **Host app dev server**: `nx serve console` — Webpack starts, no `Module not found` errors for relative imports inside the library.
+1. **`nx lint feature-vulnerability-remediation`** — clean (or matches workspace's normal warning level).
+2. **`nx typecheck feature-vulnerability-remediation`** — no errors.
+3. **`bps-hub` dev server** (`nx serve bps-hub`) — Webpack starts, no `Module not found` errors for relative imports inside the library.
 4. **Browser smoke test**: navigate to the route mounting `<ExecutiveDashboard />`; confirm:
    - Header, sidebar, stat cards render with correct colors (shadcn tokens working).
-   - AG Grid loads vulnerabilities with no license watermark (Saved Views toolbar visible).
+   - AG Grid loads vulnerabilities with no license watermark; Saved Views toolbar visible.
    - Charts render without crashes.
    - Console clean of `process.env.NEXT_PUBLIC_*` warnings.
 5. **Saved Views**: switch built-in views, create one custom view, reload — verify `localStorage` persists.
-6. **Bundle inspect**: confirm no `_next/` paths, no `next/` runtime, no `@vercel/analytics` script in the host's production bundle.
+6. **Bundle inspect**: no `_next/` paths, no `next/` runtime, no `@vercel/analytics` script.
+
+---
+
+## Roadmap: extracting sibling libraries
+
+Once a second feature joins `libs/vulnerability-management/`, plan these extractions to stop duplicating code:
+
+| Today (inside this feature) | Tomorrow (sibling lib) | Import path |
+|---|---|---|
+| `src/lib/components/ui/` (shadcn primitives) | `libs/vulnerability-management/ui/` | `@my-org/vulnerability-management-ui` |
+| `src/lib/hooks/` | `libs/vulnerability-management/hooks/` | `@my-org/vulnerability-management-hooks` |
+| `src/lib/lib/utils.ts` + `use-viewport.ts` | `libs/vulnerability-management/utils/` | `@my-org/vulnerability-management-utils` |
+| `src/lib/lib/types.ts` | `libs/vulnerability-management/types/` | `@my-org/vulnerability-management-types` |
+| `src/lib/lib/mock-data.ts` + `executive-data.ts` | `libs/vulnerability-management/data-access-mock/` | `@my-org/vulnerability-management-data-access-mock` |
+
+When you extract, the feature's relative imports (`../ui/button`, `../../lib/utils`) become package imports — find-and-replace inside `src/lib/`.
 
 ---
 
@@ -294,21 +323,21 @@ If you need to expose more components (e.g. `<VulnerabilitiesPage />` as a stand
 
 | Removed | Why |
 |---|---|
-| `app/layout.tsx`, `app/page.tsx`, `app/globals.css` | Next-specific. Layout and globals are now host responsibility. |
+| `app/layout.tsx`, `app/page.tsx`, `app/globals.css` | Next-specific. Layout + globals are `bps-hub`'s responsibility. |
 | `next.config.mjs`, `next-env.d.ts` | Next-specific. |
-| `@vercel/analytics` | Vercel-specific. Host can add its own analytics. |
+| `@vercel/analytics` | Vercel-specific. `bps-hub` adds its own analytics if needed. |
 | `next/font/google` imports | Font handled by host's existing Tailwind `font-sans` utility. |
-| `process.env.NEXT_PUBLIC_*` reads | License keys now come through `configureDashboard()`. |
+| `process.env.NEXT_PUBLIC_*` reads | License keys now flow through `configureDashboard()`. |
 | `"use client"` directives | Harmless in plain React, removed for cleanliness. |
 | Internal `@/foo/bar` aliases | Converted to relative imports for Webpack compatibility. |
-| 6 dead-code legacy components | They had stale TS errors and were never imported. |
+| 6 dead-code legacy components | Had stale TS errors and were never imported. |
 
 ## What stayed unchanged
 
 | Kept | Why |
 |---|---|
 | All shadcn/ui components | Pure Radix UI — framework-agnostic. |
-| `next-themes` (the package) | Despite the name, it works in any React app. |
+| `next-themes` package | Despite the name, it works in any React app. |
 | AG Grid table, cell renderers, Saved Views | Pure React. |
 | Recharts charts | Pure React. |
 | All mock data | Deterministic — no `Math.random()` or live timestamps. |

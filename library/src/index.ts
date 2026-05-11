@@ -1,4 +1,4 @@
-// Public API of @my-org/vuln-dashboard.
+// Public API of @my-org/feature-vulnerability-remediation.
 //
 // This is a NON-BUILDABLE Nx library: the host app's Webpack compiles src/
 // directly. No CSS is shipped — the host's existing shadcn/ui-based Tailwind
@@ -6,7 +6,7 @@
 // --muted-foreground, --border, etc.), so no separate stylesheet is needed.
 //
 // Host usage:
-//   import { configureDashboard, ExecutiveDashboard } from "@my-org/vuln-dashboard";
+//   import { configureDashboard, ExecutiveDashboard } from "@my-org/feature-vulnerability-remediation";
 //   configureDashboard({ agGridLicenseKey: "...", agChartsLicenseKey: "..." });
 //   <ExecutiveDashboard />
 //

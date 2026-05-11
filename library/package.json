@@ -1,5 +1,5 @@
 {
-  "name": "@my-org/vuln-dashboard",
+  "name": "@my-org/feature-vulnerability-remediation",
   "version": "0.0.1",
   "private": true,
   "type": "commonjs"
