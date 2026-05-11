@@ -43,7 +43,15 @@
       "mcp__ag-mcp__detect_version",
       "mcp__ag-mcp__search_docs",
       "Bash(tee /tmp/tsc-out.txt)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq npm*\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill *)",
+      "Bash(awk '{print $5}')",
+      "Bash(tasklist //FI \"PID eq 22552\")",
+      "Bash(tasklist //FI \"PID eq 1980\")",
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"executive dashboard KPI summary cards row count layout\" --domain ux -n 6)"
     ]
   }
 }

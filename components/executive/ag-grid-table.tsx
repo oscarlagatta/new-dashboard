@@ -63,6 +63,21 @@ import { USERS } from "@/lib/mock-data";
 import "@/lib/ag-grid-setup";
 import { useSavedViews } from "@/hooks/use-saved-views";
 import { useSavedViewsToolbarUi } from "@/components/vulnerability/saved-views-toolbar";
+import {
+  ExportDialog,
+  fireExportStartedToast,
+  type ExportColumnOption,
+  type ExportSelection,
+} from "@/components/vulnerability/export-dialog";
+import {
+  matchesPreset,
+  FILTER_PRESETS,
+  type FilterPresetId,
+} from "@/lib/filter-presets";
+import {
+  DEFAULT_DASHBOARD_SETTINGS,
+  type DashboardSettings,
+} from "@/lib/dashboard-settings";
 
 // For production: replace with rowModelType='serverSide' and provide a
 // serverSideDatasource that calls the .NET API endpoint.
@@ -323,6 +338,12 @@ interface Props {
   sheetOpen: boolean;
   onSheetChange: (open: boolean) => void;
   onSave: (updated: Vulnerability) => void;
+  /** External filter preset applied from a dashboard card / Action Required row. */
+  filterPreset?: FilterPresetId | null;
+  /** Dashboard settings (e.g., validation-pending threshold). */
+  settings?: DashboardSettings;
+  /** Notify the parent so it can clear the preset (e.g., when user hits "Clear all"). */
+  onClearFilterPreset?: () => void;
 }
 
 export function AgGridTriageTable({
@@ -332,11 +353,15 @@ export function AgGridTriageTable({
   sheetOpen,
   onSheetChange,
   onSave,
+  filterPreset = null,
+  settings = DEFAULT_DASHBOARD_SETTINGS,
+  onClearFilterPreset,
 }: Props) {
   const gridRef = useRef<AgGridReact>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [gridApi, setGridApi] = useState<any>(null);
   const [quickFilter, setQuickFilter] = useState("");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [filters, setFilters] = useState<Record<FilterKey, Set<string>>>(
     () =>
       Object.fromEntries(
@@ -361,7 +386,8 @@ export function AgGridTriageTable({
   }, [filters]);
 
   // Shared predicate so the grid (desktop/tablet) and card list (mobile)
-  // apply the same filter logic.
+  // apply the same filter logic. Includes the toolbar multi-selects AND any
+  // active filter preset coming from a dashboard card.
   const matchesFilters = useCallback(
     (v: Vulnerability) => {
       for (const [key, vals] of Object.entries(filters) as [FilterKey, Set<string>][]) {
@@ -378,15 +404,16 @@ export function AgGridTriageTable({
         const cell = fieldMap[key] ?? "";
         if (!vals.has(cell)) return false;
       }
+      if (filterPreset && !matchesPreset(v, filterPreset, settings)) return false;
       return true;
     },
-    [filters]
+    [filters, filterPreset, settings]
   );
 
   // Apply external filters via grid's external filter mechanism
   const isExternalFilterPresent = useCallback(
-    () => activeFilters.length > 0,
-    [activeFilters]
+    () => activeFilters.length > 0 || !!filterPreset,
+    [activeFilters, filterPreset]
   );
 
   const doesExternalFilterPass = useCallback(
@@ -922,12 +949,13 @@ export function AgGridTriageTable({
     }
   }, [quickFilter]);
 
-  // External filter notify
+  // External filter notify — both toolbar filters and the preset are
+  // external filters, so either one changing must re-evaluate every row.
   useEffect(() => {
     if (gridRef.current?.api) {
       gridRef.current.api.onFilterChanged();
     }
-  }, [filters]);
+  }, [filters, filterPreset]);
 
   const clearAllFilters = useCallback(() => {
     setFilters(
@@ -936,10 +964,11 @@ export function AgGridTriageTable({
       ) as Record<FilterKey, Set<string>>
     );
     setQuickFilter("");
+    onClearFilterPreset?.();
     if (gridRef.current?.api) {
       gridRef.current.api.setFilterModel(null);
     }
-  }, []);
+  }, [onClearFilterPreset]);
 
   const clearSelection = useCallback(() => {
     gridRef.current?.api?.deselectAll();
@@ -950,6 +979,38 @@ export function AgGridTriageTable({
       fileName: `vulnerabilities-${new Date().toISOString().split("T")[0]}.csv`,
       onlySelected: (gridRef.current?.api?.getSelectedRows().length ?? 0) > 0,
     });
+  }, []);
+
+  // Snapshot of every column the grid knows about plus which are currently
+  // visible — feeds the Export dialog's column checklist so the user's default
+  // selection matches what they see on screen. The leading checkbox column
+  // has no headerName and is filtered out.
+  const getExportColumns = useCallback((): ExportColumnOption[] => {
+    const api = gridRef.current?.api;
+    if (!api) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cols = api.getColumns?.() ?? [];
+    return (
+      cols
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((col: any) => {
+          const def = col.getColDef() as ColDef<Vulnerability>;
+          return {
+            colId: col.getColId() as string,
+            label: (def.headerName as string | undefined) ?? "",
+            visible: col.isVisible() as boolean,
+          };
+        })
+        .filter((c: ExportColumnOption) => c.label.length > 0)
+    );
+  }, []);
+
+  const handleExport = useCallback((selection: ExportSelection) => {
+    // Backend wiring lands later; for now log the resolved selection so
+    // engineering can verify the payload during integration.
+    // eslint-disable-next-line no-console
+    console.log("[ExportFindings]", selection);
+    fireExportStartedToast();
   }, []);
 
   const bulkAssignOwner = useCallback((owner: string) => {
@@ -1055,9 +1116,14 @@ export function AgGridTriageTable({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      {/* Root is a flex column that fills its parent (the VulnerabilitiesPage
+          body, which is itself flex:1). Toolbar + chip strip stay shrink:0;
+          the grid wrapper takes flex-1 so it stretches to the bottom of the
+          viewport. AG Grid's pagination bar lives inside the grid, so it
+          naturally pins to the bottom of the grid area. */}
+      <div className="flex flex-col gap-2 flex-1 min-h-0">
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           {/* Saved Views selector — left of search; grid-only feature */}
           {!isMobile && savedViewsUi.selector}
 
@@ -1094,6 +1160,21 @@ export function AgGridTriageTable({
               onChange={(next) => setFilters((f) => ({ ...f, [key]: next }))}
             />
           ))}
+
+          {/* Export — opens the configurable Export Findings dialog. Sits
+              right of the filter controls per spec. */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+              onClick={() => setExportDialogOpen(true)}
+              aria-label="Open export findings dialog"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export…
+            </Button>
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
@@ -1140,8 +1221,23 @@ export function AgGridTriageTable({
         </div>
 
         {/* Active filter chips */}
-        {(activeFilters.length > 0 || quickFilter) && (
-          <div className="flex flex-wrap items-center gap-1.5">
+        {(activeFilters.length > 0 || quickFilter || filterPreset) && (
+          <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
+            {filterPreset && (
+              <span
+                key={`preset-${filterPreset}`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium"
+              >
+                {FILTER_PRESETS[filterPreset].label}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => onClearFilterPreset?.()}
+                  aria-label={`Remove ${FILTER_PRESETS[filterPreset].label} filter`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
             {activeFilters.map(({ key, value }) => (
               <span
                 key={`${key}-${value}`}
@@ -1172,11 +1268,12 @@ export function AgGridTriageTable({
           </div>
         )}
 
-        {/* Grid (desktop / tablet) — Card list (mobile) */}
+        {/* Grid (desktop / tablet) — Card list (mobile). Wrapper takes
+            flex-1 so it fills the parent flex column; AG Grid's own
+            scrollbar handles overflow inside. */}
         {isMobile ? (
           <div
-            className="w-full rounded-md border border-border/60 vrd-ag-grid bg-background overflow-y-auto"
-            style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
+            className="w-full rounded-md border border-border/60 vrd-ag-grid bg-background overflow-y-auto flex-1 min-h-0"
             role="list"
             aria-label="Vulnerabilities"
           >
@@ -1197,13 +1294,11 @@ export function AgGridTriageTable({
             )}
           </div>
         ) : (
-          <div
-            className="ag-theme-quartz w-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid"
-            style={{ height: "min(calc(100dvh - 240px), 75vh)", minHeight: 360 }}
-          >
+          <div className="ag-theme-quartz w-full h-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid flex-1 min-h-0">
             <AgGridReact<Vulnerability>
               ref={gridRef}
               rowData={vulnerabilities}
+              domLayout="normal"
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
               onGridReady={onGridReady}
@@ -1252,6 +1347,14 @@ export function AgGridTriageTable({
 
       {/* Saved Views dialogs (Save / Rename / Delete) — portaled */}
       {savedViewsUi.dialogs}
+
+      {/* Configurable export — opened via the "Export…" toolbar button */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        columns={exportDialogOpen ? getExportColumns() : []}
+        onExport={handleExport}
+      />
 
       {/* Detail Sheet */}
       {selectedVuln && (
