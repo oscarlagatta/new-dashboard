@@ -333,14 +333,165 @@ export const SLA_COMPLIANCE_BY_PRIORITY: SlaComplianceRow[] = [
 
 export const SLA_OVERALL_COMPLIANCE = 93;
 
+// Top unresolved vulnerabilities — highest-priority open findings ranked
+// either by severity (priority + days open tiebreaker) or by affected host
+// count. The widget exposes a toggle between the two orderings; the rank
+// number is computed at render time based on the active sort.
+import type { SeverityRisk } from "./types";
+
+export interface UnresolvedVuln {
+  id: string;
+  title: string;
+  cve: string;                 // "" if not assigned
+  severity: SeverityRisk;
+  daysOpen: number;
+  affectedHosts: number;
+}
+
+export const TOP_UNRESOLVED_VULNS: UnresolvedVuln[] = [
+  {
+    id: "tuv-1",
+    title: "Apache Log4j2 JNDI Lookup Remote Code Execution (Log4Shell variant)",
+    cve: "CVE-2024-44228",
+    severity: "Priority 1",
+    daysOpen: 142,
+    affectedHosts: 1_847,
+  },
+  {
+    id: "tuv-2",
+    title: "OpenSSL DTLS Buffered Message Processing Use-After-Free",
+    cve: "CVE-2024-29847",
+    severity: "Priority 1",
+    daysOpen: 118,
+    affectedHosts: 1_524,
+  },
+  {
+    id: "tuv-3",
+    title: "Microsoft Exchange Server Authenticated Remote Code Execution",
+    cve: "CVE-2024-38213",
+    severity: "Priority 1",
+    daysOpen: 94,
+    affectedHosts: 1_312,
+  },
+  {
+    id: "tuv-4",
+    title: "Spring Framework Reflected File Download via ContentNegotiation",
+    cve: "CVE-2024-22243",
+    severity: "Priority 1",
+    daysOpen: 67,
+    affectedHosts: 982,
+  },
+  {
+    id: "tuv-5",
+    title: "Cisco IOS XE Web UI Authentication Bypass",
+    cve: "CVE-2024-31982",
+    severity: "Priority 2",
+    daysOpen: 88,
+    affectedHosts: 864,
+  },
+  {
+    id: "tuv-6",
+    title: "VMware vCenter Server Heap Overflow in DCERPC Protocol Handler",
+    cve: "CVE-2024-37085",
+    severity: "Priority 1",
+    daysOpen: 41,
+    affectedHosts: 743,
+  },
+  {
+    id: "tuv-7",
+    title: "F5 BIG-IP iControl REST Authentication Bypass via TMUI",
+    cve: "CVE-2024-26026",
+    severity: "Priority 2",
+    daysOpen: 73,
+    affectedHosts: 612,
+  },
+  {
+    id: "tuv-8",
+    title: "Citrix NetScaler ADC Sensitive Information Disclosure (CitrixBleed 2)",
+    cve: "CVE-2024-5491",
+    severity: "Priority 2",
+    daysOpen: 52,
+    affectedHosts: 489,
+  },
+  {
+    id: "tuv-9",
+    title: "PostgreSQL Stack Buffer Overflow in pg_dump under untrusted schema",
+    cve: "",
+    severity: "Priority 2",
+    daysOpen: 38,
+    affectedHosts: 367,
+  },
+  {
+    id: "tuv-10",
+    title: "Apache HTTP Server mod_rewrite Heap-Based Buffer Overflow",
+    cve: "CVE-2024-38476",
+    severity: "Priority 3",
+    daysOpen: 29,
+    affectedHosts: 218,
+  },
+  {
+    id: "tuv-11",
+    title: "Linux Kernel netfilter nf_tables Use-After-Free Privilege Escalation",
+    cve: "CVE-2024-1086",
+    severity: "Priority 1",
+    daysOpen: 22,
+    affectedHosts: 1_104,
+  },
+  {
+    id: "tuv-12",
+    title: "Jenkins CLI Command Parser Arbitrary File Read",
+    cve: "CVE-2024-23897",
+    severity: "Priority 2",
+    daysOpen: 18,
+    affectedHosts: 196,
+  },
+];
+
+// Top EOL exposures — End-of-Life technologies still in the estate.
+// Ranked by criticality + host count so the worst gaps surface first.
+export interface EolExposure {
+  rank: number;
+  technology: string;
+  eolDate: string;            // ISO yyyy-mm-dd; renderer formats it
+  severity: Severity;
+  affectedHosts: number;
+}
+
+export const EOL_EXPOSURES: EolExposure[] = [
+  { rank: 1,  technology: "Windows Server 2012 R2",   eolDate: "2023-10-10", severity: "Critical", affectedHosts: 8_412 },
+  { rank: 2,  technology: "Java 8 (Oracle JDK)",      eolDate: "2022-03-31", severity: "Critical", affectedHosts: 6_874 },
+  { rank: 3,  technology: "OpenSSL 1.0.2",            eolDate: "2019-12-31", severity: "Critical", affectedHosts: 5_241 },
+  { rank: 4,  technology: "Python 2.7",               eolDate: "2020-01-01", severity: "High",     affectedHosts: 4_198 },
+  { rank: 5,  technology: "Red Hat Enterprise Linux 6", eolDate: "2020-11-30", severity: "High",   affectedHosts: 3_726 },
+  { rank: 6,  technology: "Node.js 14 LTS",           eolDate: "2023-04-30", severity: "High",     affectedHosts: 2_983 },
+  { rank: 7,  technology: "Apache Tomcat 7",          eolDate: "2021-03-31", severity: "High",     affectedHosts: 2_117 },
+  { rank: 8,  technology: "MySQL 5.7",                eolDate: "2023-10-31", severity: "Medium",   affectedHosts: 1_842 },
+  { rank: 9,  technology: ".NET Framework 4.5.2",     eolDate: "2022-04-26", severity: "Medium",   affectedHosts: 1_359 },
+  { rank: 10, technology: "Ubuntu 18.04 LTS",         eolDate: "2023-05-31", severity: "Medium",   affectedHosts: 974 },
+];
+
 // Aggregated KPI counts — in production these come from a server-side aggregation
 // API, not from counting paginated rows. The AG Grid table is a separate request.
+//
+// IMPORTANT: When a stat card is clicked, the AG Grid table is filtered via the
+// preset matcher against the *paginated* 50-row mock dataset, so the grid will
+// show far fewer rows than the card's aggregate count. In production both come
+// from the server (card from /api/stats, grid from /api/vulns?filter=...).
 export const DASHBOARD_STATS = {
-  total:        2_847_291,
-  awaiting:       124_583,
-  inProgress:     312_847,
-  pendingClear:   198_412,
-  resolved:       563_204,
-  priority1:        8_423,
-  overdue:        134_892,
+  total:                          2_847_291,
+  awaiting:                         124_583,
+  inProgress:                       312_847,
+  pendingClear:                     198_412,
+  resolved:                         563_204,
+  priority1:                          8_423,
+  overdue:                          134_892,
+  // New triage-gap metrics (matching the 3 new stat cards)
+  noRemediationDate:                 47_312,
+  awaitingScan:                      89_127,
+  riskAccepted:                      12_854,
+  // Action Required panel — these mirror the stat-card aggregates where
+  // applicable, with a dedicated count for "validation pending > threshold".
+  findingsMissingPlan:               47_312, // same dimension as noRemediationDate
+  validationPendingOverThreshold:    38_961,
+  completedButNotValidated:          89_127, // same dimension as awaitingScan
 };

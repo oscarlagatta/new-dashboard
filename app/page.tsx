@@ -35,10 +35,18 @@ import {
 import { AgGridTriageTable } from "@/components/executive/ag-grid-table";
 import { SourceBarChart, DaysOpenChart, RemediationTrendChart, SlaComplianceChart } from "@/components/dashboard/charts";
 import { BlockersStrip } from "@/components/dashboard/blockers-strip";
+import { NoRemediationDateCard } from "@/components/executive/no-remediation-date-card";
+import { AwaitingScanCard } from "@/components/executive/awaiting-scan-card";
+import { RiskAcceptedCard } from "@/components/executive/risk-accepted-card";
+import { ActionRequiredPanel } from "@/components/executive/action-required-panel";
+import { EolExposures } from "@/components/executive/eol-exposures";
+import { TopUnresolvedVulnerabilities } from "@/components/executive/top-unresolved-vulnerabilities";
 import { mockVulnerabilities, CIO_TEAMS } from "@/lib/mock-data";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
 import { useViewport } from "@/lib/use-viewport";
+import { DEFAULT_DASHBOARD_SETTINGS } from "@/lib/dashboard-settings";
+import type { FilterPresetId } from "@/lib/filter-presets";
 import {
   DASHBOARD_STATS,
   SOURCE_CHART_OPEN,
@@ -85,6 +93,11 @@ const KEYFRAMES = `
     .src-dashboard .vrd-chart-card { flex: 0 0 auto !important; width: 100% !important; height: auto !important; min-height: 360px !important; }
     .src-dashboard .vrd-stat-row { flex-wrap: wrap !important; flex: 0 0 auto !important; }
     .src-dashboard .vrd-stat-card { flex: 1 1 calc(50% - 6px) !important; min-width: 0 !important; }
+    /* Top Unresolved + EOL Exposures stack on tablet/phone */
+    .src-dashboard .vrd-ranked-row { grid-template-columns: 1fr !important; }
+    /* Charts row no longer stretches with flex:1 on desktop; on tablet allow
+       natural height so the column stack rule above can take effect. */
+    .src-dashboard .vrd-charts-row { height: auto !important; }
     .src-dashboard .vrd-main-content { flex: 0 0 auto !important; min-height: 0 !important; }
     .src-dashboard .vrd-content-area { padding: 12px 14px !important; margin-left: 0 !important; }
     .src-dashboard .vrd-header-title { font-size: 17px !important; }
@@ -117,13 +130,8 @@ const KEYFRAMES = `
   /* Block horizontal scroll on the host page when sidebar drawer is open */
   .src-dashboard.vrd-drawer-open { overflow: hidden !important; }
 
-  /* AG Grid resizes its own height; ensure the wrapper doesn't blow past viewport */
-  @media (max-width: 1023px) {
-    .src-dashboard .vrd-ag-grid { height: min(calc(100dvh - 320px), 70vh) !important; }
-  }
-  @media (max-width: 767px) {
-    .src-dashboard .vrd-ag-grid { height: min(calc(100dvh - 360px), 65vh) !important; min-height: 320px !important; }
-  }
+  /* Grid wrapper sizes via flex-1 inside the Vulnerabilities page card now;
+     no per-viewport height overrides — the parent flex column controls it. */
 
   /* Prevent horizontal page scroll caused by very wide content */
   .src-dashboard { overflow-x: hidden; }
@@ -1040,12 +1048,20 @@ interface DashboardStats {
   resolved: number;
   priority1: number;
   overdue: number;
+  noRemediationDate: number;
+  awaitingScan: number;
+  riskAccepted: number;
+  findingsMissingPlan: number;
+  validationPendingOverThreshold: number;
+  completedButNotValidated: number;
 }
 
 interface DashboardPageProps {
   stats: DashboardStats;
   onNavigate: (page: Page) => void;
   vulnerabilities: Vulnerability[];
+  /** Set a grid filter preset and navigate to the Vulnerabilities page. */
+  onApplyFilterPreset: (preset: FilterPresetId) => void;
 }
 
 type Dimension = "application" | "source" | "owner";
@@ -1062,7 +1078,8 @@ function shortDimensionLabel(value: string): string {
   return value.slice(0, 13) + "…";
 }
 
-function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProps) {
+function DashboardPage({ stats, onNavigate, vulnerabilities, onApplyFilterPreset }: DashboardPageProps) {
+  const dashboardSettings = DEFAULT_DASHBOARD_SETTINGS;
   const [chartFilter, setChartFilter] = useState<"open" | "all">("open");
   const [dimension, setDimension] = useState<Dimension>("application");
 
@@ -1141,26 +1158,147 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
 
   return (
     <div className="vrd-page-content" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }} aria-label="Dashboard">
-      {/* Stat cards */}
+      {/* PRIMARY TIER — full-weight headline KPIs (the daily workload). */}
+      <div className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-2">
+        Workload
+      </div>
       <section
         className="vrd-stat-row"
-        style={{ display: "flex", gap: 12, marginBottom: 10, alignItems: "stretch" }}
-        aria-label="Summary statistics"
+        style={{ display: "flex", gap: 12, alignItems: "stretch" }}
+        aria-label="Workload — primary triage-status KPIs"
       >
         {STAT_CARDS.map((card) => (
           <StatCard key={card.label} {...card} onNavigate={onNavigate} />
         ))}
       </section>
 
-      {/* Blockers rollup — turns triage decisions into org-level visibility */}
-      <section style={{ marginBottom: 10 }} aria-label="Remediation blockers">
+      {/* Divider separating primary headline KPIs from the lighter
+          secondary indicator tier — visually splits "workload" from "signals". */}
+      <div className="h-px bg-slate-200 my-3" role="separator" aria-hidden="true" />
+
+      {/* SECONDARY TIER — lighter risk-signal indicators. Compact cards
+          (~70% height, text-2xl number, colored left border, no accent strip). */}
+      <div className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-2">
+        Risk signals
+      </div>
+      <section
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3"
+        aria-label="Risk signals — secondary indicators"
+      >
+        <NoRemediationDateCard
+          count={stats.noRemediationDate}
+          onClick={() => onApplyFilterPreset("noRemediationDate")}
+        />
+        <AwaitingScanCard
+          count={stats.awaitingScan}
+          onClick={() => onApplyFilterPreset("awaitingScan")}
+        />
+        <RiskAcceptedCard
+          count={stats.riskAccepted}
+          onClick={() => onApplyFilterPreset("riskAccepted")}
+        />
+      </section>
+
+      {/* Action Required — full-width, elevated (amber tint + border) so it
+          reads as the most urgent thing on the page. Stripped down to only
+          threshold-based items; status counts moved to secondary cards above. */}
+      <section className="mb-3" aria-label="Action required">
+        <ActionRequiredPanel
+          settings={dashboardSettings}
+          counts={{
+            validationPendingOverThreshold: stats.validationPendingOverThreshold,
+          }}
+          onSelectPreset={onApplyFilterPreset}
+        />
+      </section>
+
+      {/* SLA Compliance + Remediation Trend — paired charts. SLA is the
+          compliance signal (must read at-a-glance); Trend is historical
+          context. Sit side-by-side; stacks on tablet via .vrd-ranked-row. */}
+      <section
+        className="vrd-ranked-row mb-3"
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        aria-label="SLA compliance and remediation trend"
+      >
+        <div
+          className="vrd-chart-card"
+          style={{
+            background: "#F9FAFB",
+            borderRadius: CARD_RADIUS,
+            boxShadow: CARD_SHADOW,
+            padding: "14px 18px",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 280,
+          }}
+        >
+          <div className="flex items-center justify-between mb-2.5 gap-2">
+            <span className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+              <span className="w-[30px] h-[30px] rounded-full bg-white flex items-center justify-center shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+                <CheckCircle2 className="w-4 h-4 text-slate-500" aria-hidden="true" />
+              </span>
+              SLA Compliance
+            </span>
+            <span className="text-[11px] text-slate-400">By priority</span>
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <SlaComplianceChart />
+          </div>
+        </div>
+
+        <div
+          className="vrd-chart-card"
+          style={{
+            background: "#F9FAFB",
+            borderRadius: CARD_RADIUS,
+            boxShadow: CARD_SHADOW,
+            padding: "14px 18px",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 280,
+          }}
+        >
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <span className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+              <span className="w-[30px] h-[30px] rounded-full bg-white flex items-center justify-center shrink-0 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+                <TrendingUp className="w-4 h-4 text-slate-500" aria-hidden="true" />
+              </span>
+              Remediation Trend
+            </span>
+            <span className="text-[11px] text-slate-400">Last 12 weeks</span>
+          </div>
+          <div className="flex-1 min-h-0">
+            <RemediationTrendChart />
+          </div>
+        </div>
+      </section>
+
+      {/* PRIORITY FINDINGS — the two ranked lists. Moved up from below the
+          fold so users see the worst-of-the-worst items without scrolling. */}
+      <div className="text-xs uppercase tracking-widest text-slate-400 font-medium mb-2">
+        Priority findings
+      </div>
+      <section
+        className="vrd-ranked-row mb-3"
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}
+        aria-label="Top exposures and unresolved findings"
+      >
+        <TopUnresolvedVulnerabilities />
+        <EolExposures />
+      </section>
+
+      {/* What's Blocking Remediation — operational detail; placed directly
+          above the App/Days-Open charts since it's chart-row context, not a
+          status signal that belongs in the elevated attention zone. */}
+      <section className="mb-3" aria-label="Remediation blockers">
         <BlockersStrip vulnerabilities={vulnerabilities} />
       </section>
 
-      {/* Charts row */}
+      {/* Charts row — explicit height so the row doesn't fight the EOL widget
+          below for vertical space. */}
       <section
         className="vrd-charts-row"
-        style={{ display: "flex", gap: 12, alignItems: "stretch", marginBottom: 10, flex: 1, minHeight: 0 }}
+        style={{ display: "flex", gap: 12, alignItems: "stretch", marginBottom: 10, height: 380, flexShrink: 0 }}
         aria-label="Data visualizations"
       >
         {/* Left: Source bar chart (60%) */}
@@ -1374,63 +1512,6 @@ function DashboardPage({ stats, onNavigate, vulnerabilities }: DashboardPageProp
         </div>
       </section>
 
-      {/* Second charts row — Remediation Trend + SLA Compliance */}
-      <section
-        className="vrd-charts-row"
-        style={{ display: "flex", gap: 12, alignItems: "stretch", flex: 1, minHeight: 0 }}
-        aria-label="Trend and SLA analytics"
-      >
-        {/* Remediation Trend */}
-        <div className="vrd-chart-card" style={{ flex: "0 0 55%", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div
-            className="vrd-chart-toolbar"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 8,
-              gap: 8,
-            }}
-          >
-            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <TrendingUp style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
-              </div>
-              Remediation Trend
-            </span>
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>Last 12 weeks</span>
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <RemediationTrendChart />
-          </div>
-        </div>
-
-        {/* SLA Compliance */}
-        <div className="vrd-chart-card" style={{ flex: "0 0 calc(45% - 6px)", ...cardStyle, background: "#F9FAFB", padding: "14px 18px", display: "flex", flexDirection: "column", minHeight: 0 }}>
-          <div
-            className="vrd-chart-toolbar"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 10,
-              gap: 8,
-            }}
-          >
-            <span className="vrd-chart-title" style={{ fontSize: 15, fontWeight: 600, color: "#111827", display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", flexShrink: 0 }}>
-                <CheckCircle2 style={{ width: 16, height: 16, color: "#6B7280" }} aria-hidden="true" />
-              </div>
-              SLA Compliance
-            </span>
-            <span style={{ fontSize: 11, color: "#9CA3AF" }}>By priority</span>
-          </div>
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <SlaComplianceChart />
-          </div>
-        </div>
-      </section>
-
     </div>
   );
 }
@@ -1446,6 +1527,8 @@ interface VulnerabilitiesPageProps {
   onSave: (v: Vulnerability) => void;
   selectedCio: (typeof CIO_TEAMS)[0];
   stats: { total: number };
+  filterPreset: FilterPresetId | null;
+  onClearFilterPreset: () => void;
 }
 
 function VulnerabilitiesPage({
@@ -1457,6 +1540,8 @@ function VulnerabilitiesPage({
   onSave,
   selectedCio,
   stats,
+  filterPreset,
+  onClearFilterPreset,
 }: VulnerabilitiesPageProps) {
   const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
 
@@ -1471,9 +1556,13 @@ function VulnerabilitiesPage({
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        // Fill remaining vertical space inside <main> so the grid below can
+        // take flex-1 and reach the bottom of the viewport.
+        flex: 1,
+        minHeight: 0,
       }}
     >
-      {/* Slim inner header */}
+      {/* Slim inner header — fixed height */}
       <div
         className="vrd-vuln-page-header"
         style={{
@@ -1498,8 +1587,19 @@ function VulnerabilitiesPage({
         </p>
       </div>
 
-      {/* Toolbar + grid */}
-      <div className="vrd-vuln-page-body" style={{ padding: "14px 20px 20px" }}>
+      {/* Toolbar + grid — becomes the flex container that hosts the grid.
+          flex:1 + minHeight:0 + flexDirection:column lets the grid inside
+          claim every remaining pixel and show its own internal scrollbar. */}
+      <div
+        className="vrd-vuln-page-body"
+        style={{
+          padding: "14px 20px 16px",
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         <AgGridTriageTable
           vulnerabilities={vulnerabilities}
           onRowSelected={onRowSelected}
@@ -1507,6 +1607,9 @@ function VulnerabilitiesPage({
           sheetOpen={sheetOpen}
           onSheetChange={onSheetChange}
           onSave={onSave}
+          filterPreset={filterPreset}
+          settings={DEFAULT_DASHBOARD_SETTINGS}
+          onClearFilterPreset={onClearFilterPreset}
         />
       </div>
     </div>
@@ -1522,6 +1625,9 @@ export default function App() {
   const [selectedCio, setSelectedCio] = useState(CIO_TEAMS[0]!);
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Pending preset is set from the dashboard cards / Action Required rows and
+  // consumed by the Vulnerabilities page when it mounts the grid.
+  const [filterPreset, setFilterPreset] = useState<FilterPresetId | null>(null);
 
   const viewport = useViewport();
   const isCompact = viewport !== "desktop"; // mobile + tablet share the drawer treatment
@@ -1547,6 +1653,13 @@ export default function App() {
   const stats = DASHBOARD_STATS;
 
   const onNavigate = useCallback((page: Page) => setCurrentPage(page), []);
+
+  const onApplyFilterPreset = useCallback((preset: FilterPresetId) => {
+    setFilterPreset(preset);
+    setCurrentPage("vulnerabilities");
+  }, []);
+
+  const onClearFilterPreset = useCallback(() => setFilterPreset(null), []);
 
   const onRowSelected = useCallback((v: Vulnerability) => {
     setSelectedVuln(v);
@@ -1609,6 +1722,7 @@ export default function App() {
               stats={stats}
               onNavigate={onNavigate}
               vulnerabilities={mockVulnerabilities}
+              onApplyFilterPreset={onApplyFilterPreset}
             />
           ) : (
             <VulnerabilitiesPage
@@ -1620,6 +1734,8 @@ export default function App() {
               onSave={onSave}
               selectedCio={selectedCio}
               stats={stats}
+              filterPreset={filterPreset}
+              onClearFilterPreset={onClearFilterPreset}
             />
           )}
         </main>
