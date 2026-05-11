@@ -61,6 +61,8 @@ import {
 import type { Vulnerability, Disposition } from "@/lib/types";
 import { USERS } from "@/lib/mock-data";
 import "@/lib/ag-grid-setup";
+import { useSavedViews } from "@/hooks/use-saved-views";
+import { useSavedViewsToolbarUi } from "@/components/vulnerability/saved-views-toolbar";
 
 // For production: replace with rowModelType='serverSide' and provide a
 // serverSideDatasource that calls the .NET API endpoint.
@@ -773,6 +775,85 @@ export function AgGridTriageTable({
     []
   );
 
+  // ── Saved Views integration ──────────────────────────────────────────────
+  // Bridge between AG Grid imperative APIs and the useSavedViews hook.
+  // We snapshot filterModel + columnState + searchTerm into a view, and
+  // re-hydrate the same three on apply. External MultiSelect filters are
+  // intentionally not captured — views speak AG Grid's native filterModel.
+  const getCurrentSnapshot = useCallback(() => {
+    const api = gridRef.current?.api;
+    if (!api) return null;
+    return {
+      filterModel: (api.getFilterModel?.() ?? {}) as Record<string, unknown>,
+      columnState: (api.getColumnState?.() ?? []) as ColumnState[],
+      searchTerm: quickFilter,
+    };
+  }, [quickFilter]);
+
+  const applySnapshot = useCallback(
+    (snap: {
+      filterModel: Record<string, unknown>;
+      columnState: ColumnState[];
+      searchTerm: string;
+    }) => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      // Apply filter model first so AG Grid only re-renders rows once.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      api.setFilterModel(snap.filterModel as any);
+      // Reset sort across all columns before applying the view's sort so
+      // a leftover sort from the previous view doesn't linger.
+      api.applyColumnState({
+        state: snap.columnState,
+        applyOrder: true,
+        defaultState: { sort: null },
+      });
+      setQuickFilter(snap.searchTerm);
+    },
+    [],
+  );
+
+  const savedViews = useSavedViews({ getCurrentSnapshot, applySnapshot });
+
+  // Wait for both the hook to hydrate from localStorage AND AG Grid to be
+  // ready, then apply the resolved current view exactly once.
+  const initialViewAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialViewAppliedRef.current) return;
+    if (!savedViews.hydrated) return;
+    if (!gridApi) return;
+    savedViews.applyCurrentView();
+    initialViewAppliedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedViews.hydrated, gridApi]);
+
+  // Quick filter change is detected via the existing useEffect on quickFilter;
+  // bridge it into the views hook so the dot/(modified) label updates.
+  useEffect(() => {
+    if (!initialViewAppliedRef.current) return;
+    savedViews.notifyStateChanged();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickFilter]);
+
+  const handleGridStateChanged = useCallback(() => {
+    if (!initialViewAppliedRef.current) return;
+    savedViews.notifyStateChanged();
+  }, [savedViews]);
+
+  const savedViewsUi = useSavedViewsToolbarUi({
+    views: savedViews.views,
+    builtInViews: savedViews.builtInViews,
+    currentView: savedViews.currentView,
+    hasUnsavedChanges: savedViews.hasUnsavedChanges,
+    onApplyView: savedViews.applyView,
+    onSaveCurrentAsNew: savedViews.saveCurrentAsNew,
+    onUpdateCurrent: savedViews.updateCurrent,
+    onRename: savedViews.rename,
+    onDelete: savedViews.deleteView,
+    onSetDefault: savedViews.setDefault,
+    onResetCurrent: savedViews.resetCurrent,
+  });
+
   const onGridReady = useCallback((e: GridReadyEvent) => {
     setGridApi(e.api);
   }, []);
@@ -977,6 +1058,9 @@ export function AgGridTriageTable({
       <div className="flex flex-col gap-2">
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Saved Views selector — left of search; grid-only feature */}
+          {!isMobile && savedViewsUi.selector}
+
           {/* Search */}
           <div className="relative min-w-[220px] max-w-sm flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1048,6 +1132,9 @@ export function AgGridTriageTable({
                 <Download className="h-3.5 w-3.5" />
                 CSV
               </Button>
+
+              {/* Saved Views save / more — right of toolbar */}
+              {savedViewsUi.actions}
             </>
           )}
         </div>
@@ -1123,6 +1210,11 @@ export function AgGridTriageTable({
               onGridSizeChanged={onGridSizeChanged}
               onRowClicked={onRowClicked}
               onSelectionChanged={onSelectionChanged}
+              onFilterChanged={handleGridStateChanged}
+              onSortChanged={handleGridStateChanged}
+              onColumnVisible={handleGridStateChanged}
+              onColumnMoved={handleGridStateChanged}
+              onColumnResized={handleGridStateChanged}
               rowSelection={{
                 mode: "multiRow",
                 checkboxes: true,
@@ -1157,6 +1249,9 @@ export function AgGridTriageTable({
           </div>
         )}
       </div>
+
+      {/* Saved Views dialogs (Save / Rename / Delete) — portaled */}
+      {savedViewsUi.dialogs}
 
       {/* Detail Sheet */}
       {selectedVuln && (
