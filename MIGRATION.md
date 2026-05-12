@@ -121,48 +121,72 @@ src/
 
 Pasted bottom-up so every file's imports are already resolvable when you save it. After each folder, update its `index.ts`.
 
+### Rule for the whole phase
+
+**Literal moves only.** Every file moves with its content verbatim. No identifier renames, no splitting one file into two, no merging files, no API redesigns. The only "new" file in Phase 2 is `src/lib/api/saved-views.ts`, and its functions keep the original names from the source. If you find yourself wanting to rename or restructure something, stop — that belongs in a follow-up PR, not this one.
+
 ### 2.1 `types/` (no React, no I/O)
 
-| Source | → | Destination |
-|---|---|---|
-| `lib/types.ts` | → | `src/lib/types/vulnerability.ts` |
-| (new) | → | `src/lib/types/saved-view.ts` — move the `SavedView` interface out of `lib/saved-views.ts` so the type has no runtime deps |
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `lib/types.ts` | → | `src/lib/types/types.ts` | Move whole, content unchanged |
+
+`src/lib/types/index.ts` re-exports everything from `./types`. Do not split the file. The `SavedView` interface stays where it currently lives (in `lib/saved-views.ts`); it does not move into `types/`.
 
 ### 2.2 `constants/` (static data, no React)
 
-| Source | → | Destination |
-|---|---|---|
-| `lib/executive-data.ts` | → | `src/lib/constants/executive-data.ts` |
-| `lib/mock-data.ts` | → | `src/lib/constants/mock-data.ts` |
-| `lib/dashboard-settings.ts` | → | `src/lib/constants/dashboard-settings.ts` |
-| `lib/filter-presets.ts` | → | `src/lib/constants/filter-presets.ts` |
-| `getBuiltInViews`, `STORAGE_KEY_*`, `CURRENT_USER`, `DEFAULT_BUILTIN_VIEW_ID` from `lib/saved-views.ts` | → | `src/lib/constants/saved-views.ts` |
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `lib/executive-data.ts` | → | `src/lib/constants/executive-data.ts` | Move whole |
+| `lib/mock-data.ts` | → | `src/lib/constants/mock-data.ts` | Move whole |
+| `lib/dashboard-settings.ts` | → | `src/lib/constants/dashboard-settings.ts` | Move whole |
+| `lib/filter-presets.ts` | → | `src/lib/constants/filter-presets.ts` | Move whole |
+
+`lib/saved-views.ts` is **not** split across folders — see 2.3.
 
 ### 2.3 `utils/` (pure functions, no React, no DOM)
 
-| Source | → | Destination |
-|---|---|---|
-| `lib/utils.ts` (`cn` + `formatCount`) | → | `formatCount` to `src/lib/utils/format.ts`; `cn` to host if it has one, else `src/lib/utils/cn.ts` |
-| `lib/ag-grid-console-filter.ts` | → | `src/lib/utils/ag-grid-console-filter.ts` |
-| `lib/ag-grid-setup.ts` | → | `src/lib/utils/ag-grid-setup.ts` (apply env-var transform — see Phase 3) |
-| Pure helpers from `lib/saved-views.ts` (`countFilters`, `filterModelsEqual`, `columnStatesEqual`, `makeViewId`, `stableStringify`) | → | `src/lib/utils/saved-views.ts` |
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `lib/utils.ts` | → | `src/lib/utils/utils.ts` | Move whole, keep both `cn` and `formatCount` together |
+| `lib/saved-views.ts` | → | `src/lib/utils/saved-views.ts` | Move whole — interface, constants, factory function, and pure helpers all together. Untouched. |
+| `lib/ag-grid-console-filter.ts` | → | `src/lib/utils/ag-grid-console-filter.ts` | Move whole |
+| `lib/ag-grid-setup.ts` | → | `src/lib/utils/ag-grid-setup.ts` | Move whole; the only edit is the env-var transform (Phase 3) |
+
+`src/lib/utils/index.ts` re-exports from each of the above. Even if the host ships its own `cn`, keep this library's `cn` as-is. Deduping `cn` is a follow-up PR, not this migration.
 
 ### 2.4 `api/` (I/O — fetch/localStorage; the future data-access lib)
 
-| Source | → | Destination |
-|---|---|---|
-| Extract `localStorage` `loadFromStorage` / `saveToStorage` from `hooks/use-saved-views.ts` | → | new `src/lib/api/saved-views.ts` exporting `loadSavedViews()`, `saveSavedViews(views)`, `loadCurrentViewId()`, `saveCurrentViewId(id)` |
+Cut these three functions from `hooks/use-saved-views.ts` (lines 53–82 in the source) and paste them into a new file `src/lib/api/saved-views.ts`, with their original names and original signatures:
 
-This is the one structural change worth doing now — it makes the storage adapter swap-out-able for a real backend without touching the hook later.
+| Source identifier | Destination | Action |
+|---|---|---|
+| `function loadFromStorage(): { views: SavedView[]; currentId: string | null }` (lines 53–63) | `src/lib/api/saved-views.ts` | Cut and paste verbatim; add `export` |
+| `function saveToStorage(views: SavedView[]): void` (lines 65–72) | `src/lib/api/saved-views.ts` | Cut and paste verbatim; add `export` |
+| `function saveCurrentIdToStorage(id: string | null): void` (lines 74–82) | `src/lib/api/saved-views.ts` | Cut and paste verbatim; add `export` |
+
+In the hook (Phase 2.5), replace the three local function definitions with:
+
+```ts
+import {
+  loadFromStorage,
+  saveToStorage,
+  saveCurrentIdToStorage,
+} from "../api/saved-views";
+```
+
+All hook call sites already use those exact names, so no further edits in the hook body. The two `STORAGE_KEY_*` constants and the `SavedView` type that these functions reference are imported from `../utils/saved-views` (their home after Phase 2.3) — same module path the source already uses, just relocated.
+
+No renames. No new functions. No combined-loader split.
 
 ### 2.5 `hooks/`
 
-| Source | → | Destination |
-|---|---|---|
-| `lib/use-viewport.ts` | → | `src/lib/hooks/use-viewport.ts` (delete `'use client'`) |
-| `hooks/use-saved-views.ts` | → | `src/lib/hooks/use-saved-views.ts` (delete `'use client'`; replace localStorage calls with `api/saved-views`) |
-| `hooks/use-toast.ts` | → | drop if host has toast plumbing; otherwise `src/lib/hooks/use-toast.ts` |
-| `hooks/use-mobile.ts` | → | unused on dashboard pages (only by `components/ui/sidebar.tsx` shadcn primitive); skip if not vendoring that primitive |
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `lib/use-viewport.ts` | → | `src/lib/hooks/use-viewport.ts` | Move whole; delete `'use client'` line |
+| `hooks/use-saved-views.ts` | → | `src/lib/hooks/use-saved-views.ts` | Move whole; delete `'use client'` line; delete the three local function definitions (now imported from `../api/saved-views` per 2.4); update the `from "@/lib/saved-views"` import to `from "../utils/saved-views"` |
+| `hooks/use-toast.ts` | → | drop if host has toast plumbing; otherwise `src/lib/hooks/use-toast.ts` | Move whole if kept |
+| `hooks/use-mobile.ts` | → | unused on dashboard pages (only by `components/ui/sidebar.tsx` shadcn primitive); skip if not vendoring that primitive | — |
 
 ### 2.6 `components/` (leaves first, then composites)
 
@@ -210,12 +234,16 @@ Largest composite (paste **last** — imports 19 modules):
 
 ### 2.7 `pages/`
 
-- `app/page.tsx` (1751 lines, default export `App`) → `src/lib/pages/findings-remediation-page.tsx`. Keep `App` as the local name; re-export as `FindingsRemediationPage` from `src/index.ts`. Keep it monolithic on first paste; split later only if there's spare time today. Keep the `<style>{KEYFRAMES}</style>` block and `.src-dashboard` wrapper className — that's the library's CSS isolation.
+- `app/page.tsx` (1751 lines, default export `function App()`) → `src/lib/pages/page.tsx`. **Source identifier stays `App` — do not rename inside the file.** Keep it monolithic on first paste; do not split. Keep the `<style>{KEYFRAMES}</style>` block and `.src-dashboard` wrapper className — that's the library's CSS isolation.
 
 ### 2.8 Barrel exports
 
-- Per-folder `index.ts`: re-export only what crosses the folder boundary.
-- Top-level `src/index.ts`: export only `FindingsRemediationPage` and any types the host route file genuinely needs (likely none).
+- Per-folder `index.ts`: re-export only what crosses the folder boundary, using the original identifier names.
+- Top-level `src/index.ts`: the only library-public name allowed is `FindingsRemediationPage` (this is part of "naming the library" — the public symbol of the lib). Write it as a barrel-only alias of the unchanged source default export:
+  ```ts
+  export { default as FindingsRemediationPage } from "./lib/pages/page";
+  ```
+  The `App` function in `page.tsx` stays `App`.
 
 ### 2.9 Wire into bps-hub
 
@@ -233,8 +261,12 @@ Skip the cheatsheet rows for things this codebase doesn't use. The full transfor
 | `@/components/ui/<x>` | host shadcn path (e.g. `@bofa/ui`) or `../ui/<x>` if vendored | wide |
 | `@/components/<x>` | relative path inside `src/lib/components/...` | wide |
 | `@/lib/types` | `../types` (or alias via tsconfig) | many |
-| `@/lib/utils` | `../utils` (split: `cn` from host or `../utils/cn`, `formatCount` from `../utils/format`) | many |
-| `@/lib/executive-data` / `@/lib/mock-data` / `@/lib/dashboard-settings` / `@/lib/filter-presets` | `../constants` | many |
+| `@/lib/utils` | `../utils/utils` | many |
+| `@/lib/executive-data` | `../constants/executive-data` | many |
+| `@/lib/mock-data` | `../constants/mock-data` | many |
+| `@/lib/dashboard-settings` | `../constants/dashboard-settings` | many |
+| `@/lib/filter-presets` | `../constants/filter-presets` | many |
+| `@/lib/saved-views` | `../utils/saved-views` | `hooks/use-saved-views.ts` |
 | `@/lib/ag-grid-setup` (incl. `import "@/lib/ag-grid-setup"`) | `../utils/ag-grid-setup` | `ag-grid-table.tsx` |
 | `@/lib/use-viewport` | `../hooks/use-viewport` | `ag-grid-table.tsx`, page |
 | `@/hooks/use-saved-views` | `../hooks/use-saved-views` | `ag-grid-table.tsx` |
