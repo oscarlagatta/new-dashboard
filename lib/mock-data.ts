@@ -224,7 +224,7 @@ function makeActivityLog(i: number, triageStatus: TriageStatus, disposition: Dis
       userId: "system",
       userName: "System",
       userInitials: "SY",
-      action: "Vulnerability detected and imported from scan",
+      action: "Finding detected and imported from scan",
       timestamp: "2026-05-06T08:00:00.000Z",
     },
   ];

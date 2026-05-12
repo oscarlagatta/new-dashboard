@@ -587,7 +587,7 @@ export function AgGridTriageTable({
       },
       // 16. Vuln Owner
       {
-        headerName: "Vuln Owner",
+        headerName: "Finding Owner",
         field: "vulnOwner",
         width: 185,
         cellRenderer: OwnerCellRenderer,
@@ -976,7 +976,7 @@ export function AgGridTriageTable({
 
   const exportCsv = useCallback(() => {
     gridRef.current?.api?.exportDataAsCsv({
-      fileName: `vulnerabilities-${new Date().toISOString().split("T")[0]}.csv`,
+      fileName: `findings-${new Date().toISOString().split("T")[0]}.csv`,
       onlySelected: (gridRef.current?.api?.getSelectedRows().length ?? 0) > 0,
     });
   }, []);
@@ -1098,8 +1098,8 @@ export function AgGridTriageTable({
   const exportExcel = useCallback(() => {
     const selected = gridRef.current?.api?.getSelectedRows() ?? [];
     (gridRef.current?.api as unknown as { exportDataAsExcel: (opts: object) => void })?.exportDataAsExcel({
-      fileName: `vulnerabilities-${new Date().toISOString().split("T")[0]}.xlsx`,
-      sheetName: "Vulnerabilities",
+      fileName: `findings-${new Date().toISOString().split("T")[0]}.xlsx`,
+      sheetName: "Findings",
       ...(selected.length > 0 && { onlySelected: true }),
     });
   }, []);
@@ -1275,11 +1275,11 @@ export function AgGridTriageTable({
           <div
             className="w-full rounded-md border border-border/60 vrd-ag-grid bg-background overflow-y-auto flex-1 min-h-0"
             role="list"
-            aria-label="Vulnerabilities"
+            aria-label="Findings"
           >
             {cardVulns.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground p-6 text-center">
-                No vulnerabilities match the current filters.
+                No findings match the current filters.
               </div>
             ) : (
               <div className="flex flex-col gap-2 p-3">

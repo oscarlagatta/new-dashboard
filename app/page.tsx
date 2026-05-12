@@ -187,7 +187,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { id: "dashboard" as const, label: "Dashboard", Icon: LayoutDashboard },
-  { id: "vulnerabilities" as const, label: "Vulnerabilities", Icon: ShieldAlert },
+  { id: "vulnerabilities" as const, label: "Findings", Icon: ShieldAlert },
   { id: "_remediation", label: "Remediation", Icon: Wrench },
   { id: "_reports", label: "Reports", Icon: BarChart3 },
   { id: "_settings", label: "Settings", Icon: Settings },
@@ -795,7 +795,7 @@ function MetaRow({
     >
       <MetaItem
         value={formatCount(stats.total)}
-        label="vulnerabilities"
+        label="findings"
         onClick={() => onNavigate("vulnerabilities")}
       />
       <span className="vrd-header-meta-dot" style={dotStyle} aria-hidden="true" />
@@ -1067,9 +1067,9 @@ interface DashboardPageProps {
 type Dimension = "application" | "source" | "owner";
 
 const DIMENSION_TITLES: Record<Dimension, string> = {
-  application: "Vulnerabilities by Application",
-  source: "Vulnerabilities by Source",
-  owner: "Vulnerabilities by Owner",
+  application: "Findings by Application",
+  source: "Findings by Source",
+  owner: "Findings by Owner",
 };
 
 /** Truncate long labels (app names, full owner names) for the X-axis. */
@@ -1580,7 +1580,7 @@ function VulnerabilitiesPage({
             lineHeight: 1.2,
           }}
         >
-          All Vulnerabilities
+          All Findings
         </h2>
         <p style={{ fontSize: 13, color: "#6B7280", margin: "3px 0 0" }}>
           {selectedCio.name} · {department} · {formatCount(stats.total)} records total

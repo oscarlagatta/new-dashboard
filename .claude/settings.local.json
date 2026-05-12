@@ -51,7 +51,8 @@
       "Bash(awk '{print $5}')",
       "Bash(tasklist //FI \"PID eq 22552\")",
       "Bash(tasklist //FI \"PID eq 1980\")",
-      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"executive dashboard KPI summary cards row count layout\" --domain ux -n 6)"
+      "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"executive dashboard KPI summary cards row count layout\" --domain ux -n 6)",
+      "Bash(git *)"
     ]
   }
 }
