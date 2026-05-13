@@ -141,6 +141,7 @@ Pasted bottom-up so every file's imports are already resolvable when you save it
 | `lib/mock-data.ts` | → | `src/lib/constants/mock-data.ts` | Move whole |
 | `lib/dashboard-settings.ts` | → | `src/lib/constants/dashboard-settings.ts` | Move whole |
 | `lib/filter-presets.ts` | → | `src/lib/constants/filter-presets.ts` | Move whole |
+| `lib/constants/levers.ts` | → | `src/lib/constants/levers.ts` | Move whole — note source already nested under `lib/constants/`. UI-only feature; see Phase 8. |
 
 `lib/saved-views.ts` is **not** split across folders — see 2.3.
 
@@ -366,6 +367,47 @@ After `nx serve bps-hub`:
 
 ---
 
+## Phase 8 — Lever scope dropdown (UI only; data wiring deferred)
+
+A new **Lever** scope dropdown sits in the page header immediately to the right of the CIO selector. The dropdown is **UI-only on this branch**: it carries Jordan's four lever options plus an *All Levers* sentinel, but selecting a value does **not yet** filter the grid, KPIs, charts, or side-panel pager. The full integration (raw-value mapping, server-vs-client filtering, URL state, *Unclassified* bucket logic, and the meta-row / inner-header text decisions) is captured in `docs/lever-scope-discovery.md` and lands as a follow-up PR once Roger confirms the field name and raw values.
+
+### 8.1 New constants file
+
+Already listed in Phase 2.2 — no special handling. Three exports only: the `LeverScopeValue` string-literal union, the `LEVER_SCOPE_ALL` sentinel, and the `LEVER_OPTIONS` array (Jordan's four entries with `value`, `label`, `description`). No helpers, no mapping functions yet.
+
+### 8.2 `page.tsx` edits to preserve on paste
+
+`app/page.tsx` (now `src/lib/pages/page.tsx`) carries five small additions that must come across verbatim:
+
+- **Import** — `import { LEVER_OPTIONS, LEVER_SCOPE_ALL, type LeverScopeValue } from "@/lib/constants/levers";` (rewrite alias per Phase 3).
+- **App state** — `const [selectedLever, setSelectedLever] = useState<LeverScopeValue>(LEVER_SCOPE_ALL);` next to `selectedCio`.
+- **`HeaderCard` props** — `selectedLever: LeverScopeValue` and `onSelectLever: (value: LeverScopeValue) => void` added to the props interface, threaded through from `App`.
+- **`HeaderCard` locals** — `const [leverOpen, setLeverOpen] = useState(false);` next to `cioOpen`, plus the `leverTriggerShort` derivation. The derivation strips the redundant leading "Lever " from the option label so the chip reads `Lever: 1 — CTI, APS&E or EET Managed` instead of the duplicated `Lever: Lever 1 — …`.
+- **Lever Popover** — rendered immediately after the CIO Popover in the right-side actions row. Same chip styling as CIO (`vrd-header-cio-btn` class, border, radius, padding, background, hover) **plus** `minHeight: 44` and `boxSizing: "border-box"` so the chip matches the CIO chip's avatar-driven 44px height. Popover items are two-line (label + description), with *All Levers* first, a 1px divider, then the four levers. `maxWidth: 320` keeps the longer trigger labels visible before ellipsis kicks in.
+
+No new runtime dependency. The dropdown uses the existing `Popover` primitive (already on Phase 4's shadcn list as `popover`) and the `Check` / `ChevronDown` icons from `lucide-react`.
+
+### 8.3 Discovery doc
+
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `docs/lever-scope-discovery.md` | → | `libs/bps-findings-management/features/feature-findings-remediation/docs/lever-scope-discovery.md` *(or keep at repo root — decide during migration)* | Phase-1 spec for the deferred data wiring. Required reading for whoever picks up Phase 2 of the lever feature in the host. |
+
+### 8.4 Verification
+
+After `nx serve bps-hub`:
+
+- Two side-by-side chips in the header: the existing `CIO: …` selector and the new `Lever: All` chip. They must read as a matched pair — same height, border, radius, background, and hover treatment.
+- Open the Lever popover. *All Levers* appears first, followed by a divider, then the four lever options each rendered two-line (bold label on top, muted description below). The selected row carries a blue checkmark.
+- Selecting each option updates the trigger to `Lever: {N} — {description}` for numbered levers and `Lever: All` for the sentinel.
+- Selecting a lever has **no effect** on the grid, KPIs, charts, or side-panel pager. This is intentional until the Phase-2 data wiring lands — flag immediately if any filtering is observed (it would indicate an accidental wiring).
+
+### 8.5 Follow-up work (NOT in this migration)
+
+Captured in `docs/lever-scope-discovery.md` §4. Open at the time of the migration: build target (host-only vs demo-port), the field name on the wire (`Lever From VMART` vs `Levers`), raw-value mapping, the *Unclassified* bucket rule, URL state strategy (`nuqs` in the host), and the meta-row / Findings inner-header text decisions.
+
+---
+
 ## Rough effort budget
 
 | Phase | Time |
@@ -376,6 +418,7 @@ After `nx serve bps-hub`:
 | 4 (verify globals.css is dropped) | 5 min |
 | 5 (lint/test/build/visual) | 30 min for first green run; budget another 30 for stray import fixes |
 | 7 (user guide sheet wiring) | 10 min — one new file + four `page.tsx` insertions |
+| 8 (lever dropdown — UI only) | 10 min — one constants file + five `page.tsx` insertions; data wiring is a separate follow-up |
 | **Total** | ~3–4 hours assuming the host already has the shadcn set listed in Phase 4 |
 
 Biggest time sink: alias rewrites. After the folder skeleton is in place, a single find-and-replace pass per alias covers most of the 358 occurrences:

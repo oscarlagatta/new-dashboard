@@ -44,6 +44,11 @@ import { EolExposures } from "@/components/executive/eol-exposures";
 import { TopUnresolvedVulnerabilities } from "@/components/executive/top-unresolved-vulnerabilities";
 import { UserGuideSheet } from "@/components/executive/user-guide-sheet";
 import { mockVulnerabilities, CIO_TEAMS } from "@/lib/mock-data";
+import {
+  LEVER_OPTIONS,
+  LEVER_SCOPE_ALL,
+  type LeverScopeValue,
+} from "@/lib/constants/levers";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
 import { useViewport } from "@/lib/use-viewport";
@@ -503,6 +508,8 @@ interface HeaderStats {
 interface HeaderCardProps {
   selectedCio: (typeof CIO_TEAMS)[0];
   onSelectCio: (cio: (typeof CIO_TEAMS)[0]) => void;
+  selectedLever: LeverScopeValue;
+  onSelectLever: (value: LeverScopeValue) => void;
   stats: HeaderStats;
   onNavigate: (page: Page) => void;
   showMenuButton: boolean;
@@ -512,15 +519,29 @@ interface HeaderCardProps {
 function HeaderCard({
   selectedCio,
   onSelectCio,
+  selectedLever,
+  onSelectLever,
   stats,
   onNavigate,
   showMenuButton,
   onMenuClick,
 }: HeaderCardProps) {
   const [cioOpen, setCioOpen] = useState(false);
+  const [leverOpen, setLeverOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
   const initials = getInitials(selectedCio.name);
+
+  // Trigger label: "All" for the sentinel, or the option label with the
+  // redundant leading "Lever " stripped — so the full chip reads
+  // "Lever: 1 — CTI, APS&E or EET Managed" instead of "Lever: Lever 1 — …".
+  const leverTriggerShort =
+    selectedLever === "all"
+      ? "All"
+      : (LEVER_OPTIONS.find((o) => o.value === selectedLever)?.label ?? "All").replace(
+          /^Lever\s+/,
+          "",
+        );
 
   return (
     <>
@@ -705,6 +726,145 @@ function HeaderCard({
                 )}
               </button>
             ))}
+          </PopoverContent>
+        </Popover>
+
+        {/* Lever scope dropdown — sits to the right of CIO. UI only; data
+            wiring is intentionally deferred. Same chip styling as CIO,
+            including the 44px content height driven by CIO's 32px avatar. */}
+        <Popover open={leverOpen} onOpenChange={setLeverOpen}>
+          <PopoverTrigger asChild>
+            <button
+              className="vrd-header-cio-btn"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                border: "1px solid #E5E7EB",
+                borderRadius: 10,
+                padding: "6px 12px",
+                background: "#FAFAFA",
+                cursor: "pointer",
+                transition: "background 100ms",
+                maxWidth: 320,
+                minHeight: 44,
+                boxSizing: "border-box",
+              }}
+              onMouseEnter={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.background = "#F3F4F6")
+              }
+              onMouseLeave={(e) =>
+                ((e.currentTarget as HTMLButtonElement).style.background = "#FAFAFA")
+              }
+              aria-label={`Select Lever scope. Current: ${leverTriggerShort}`}
+            >
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#111827",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                Lever: {leverTriggerShort}
+              </span>
+              <ChevronDown
+                style={{ width: 14, height: 14, color: "#9CA3AF", flexShrink: 0 }}
+                aria-hidden="true"
+              />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-1" align="end">
+            {/* All Levers — sentinel option, visually separated */}
+            <button
+              onClick={() => {
+                onSelectLever("all");
+                setLeverOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-2 py-2 rounded hover:bg-muted transition-colors"
+              style={{ border: "none", background: "transparent", cursor: "pointer" }}
+              aria-label="Show all levers (clear scope)"
+            >
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#111827",
+                  textAlign: "left",
+                }}
+              >
+                All Levers
+              </span>
+              {selectedLever === "all" && (
+                <Check
+                  style={{ width: 14, height: 14, color: "#2563EB" }}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+            <div
+              style={{ height: 1, background: "#F3F4F6", margin: "4px 0" }}
+              aria-hidden="true"
+            />
+            {/* Four lever options — two-line layout (label + description) */}
+            {LEVER_OPTIONS.map((opt) => {
+              const isActive = opt.value === selectedLever;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => {
+                    onSelectLever(opt.value);
+                    setLeverOpen(false);
+                  }}
+                  className="w-full flex items-start gap-2 px-2 py-2 rounded hover:bg-muted transition-colors"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                  aria-label={`Switch to ${opt.label}`}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#111827",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {opt.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#6B7280",
+                        marginTop: 2,
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {opt.description}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <Check
+                      style={{
+                        width: 14,
+                        height: 14,
+                        color: "#2563EB",
+                        flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </PopoverContent>
         </Popover>
       </div>
@@ -1640,6 +1800,7 @@ export default function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCio, setSelectedCio] = useState(CIO_TEAMS[0]!);
+  const [selectedLever, setSelectedLever] = useState<LeverScopeValue>(LEVER_SCOPE_ALL);
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   // Pending preset is set from the dashboard cards / Action Required rows and
@@ -1721,6 +1882,8 @@ export default function App() {
         <HeaderCard
           selectedCio={selectedCio}
           onSelectCio={setSelectedCio}
+          selectedLever={selectedLever}
+          onSelectLever={setSelectedLever}
           stats={stats}
           onNavigate={onNavigate}
           showMenuButton={isCompact}
