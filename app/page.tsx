@@ -26,6 +26,7 @@ import {
   PanelLeftOpen,
   Menu,
   X as XIcon,
+  HelpCircle,
 } from "lucide-react";
 import {
   Popover,
@@ -41,6 +42,7 @@ import { RiskAcceptedCard } from "@/components/executive/risk-accepted-card";
 import { ActionRequiredPanel } from "@/components/executive/action-required-panel";
 import { EolExposures } from "@/components/executive/eol-exposures";
 import { TopUnresolvedVulnerabilities } from "@/components/executive/top-unresolved-vulnerabilities";
+import { UserGuideSheet } from "@/components/executive/user-guide-sheet";
 import { mockVulnerabilities, CIO_TEAMS } from "@/lib/mock-data";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
@@ -516,10 +518,12 @@ function HeaderCard({
   onMenuClick,
 }: HeaderCardProps) {
   const [cioOpen, setCioOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
   const initials = getInitials(selectedCio.name);
 
   return (
+    <>
     <div
       style={{
         background: "transparent",
@@ -624,6 +628,14 @@ function HeaderCard({
           </span>
         </div>
 
+        {/* User guide */}
+        <IconCircleBtn
+          aria-label="Open user guide"
+          onClick={() => setGuideOpen(true)}
+        >
+          <HelpCircle style={{ width: 17, height: 17, color: "#6B7280" }} />
+        </IconCircleBtn>
+
         {/* CIO selector */}
         <Popover open={cioOpen} onOpenChange={setCioOpen}>
           <PopoverTrigger asChild>
@@ -697,18 +709,23 @@ function HeaderCard({
         </Popover>
       </div>
     </div>
+    <UserGuideSheet open={guideOpen} onOpenChange={setGuideOpen} />
+    </>
   );
 }
 
 function IconCircleBtn({
   children,
   "aria-label": ariaLabel,
+  onClick,
 }: {
   children: React.ReactNode;
   "aria-label": string;
+  onClick?: () => void;
 }) {
   return (
     <button
+      onClick={onClick}
       style={{
         width: 36,
         height: 36,

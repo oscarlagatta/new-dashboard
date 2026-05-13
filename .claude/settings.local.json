@@ -52,7 +52,8 @@
       "Bash(tasklist //FI \"PID eq 22552\")",
       "Bash(tasklist //FI \"PID eq 1980\")",
       "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"executive dashboard KPI summary cards row count layout\" --domain ux -n 6)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(grep -E \"\\(user-guide-sheet|app/page|app\\\\\\\\\\\\\\\\page\\)\")"
     ]
   }
 }
