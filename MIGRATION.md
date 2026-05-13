@@ -198,6 +198,7 @@ Leaves (no internal deps beyond types/utils/constants):
 - `components/executive/compact-stat-card.tsx`
 - `components/executive/dashboard-stat-card.tsx`
 - `components/executive/ranked-list/ranked-list-item.tsx` + `ranked-list-card.tsx` + `index.ts`
+- `components/executive/user-guide-sheet.tsx` — header `?` button → right-side guide; see Phase 7
 - `components/vulnerability/status-badge.tsx`
 - `components/ag-grid/cell-renderers.tsx`
 
@@ -332,6 +333,39 @@ Then visual check in the running host app. Diff `apps/bps-hub/src/**/global*.css
 
 ---
 
+## Phase 7 — User Guide sheet wiring
+
+The Header now hosts a `?` icon between the notifications bell and the CIO selector that opens a right-side user guide (overview, dashboard tour, findings-grid walkthrough, triage workflow, field dictionary, keyboard shortcuts). The integration is one new leaf component plus four small edits inside `page.tsx`.
+
+### 7.1 New file
+
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `components/executive/user-guide-sheet.tsx` | → | `src/lib/components/executive/user-guide-sheet.tsx` | Leaf — imports `Sheet*` primitives from `@/components/ui/sheet`, `lucide-react` icons, and React's `ReactNode` type only. Move whole; delete `'use client'`; rewrite the `@/components/ui/sheet` alias per Phase 3. |
+
+No new runtime dependency. The shadcn `sheet` primitive is already on the Phase 4 list and is also used by `components/vulnerability/detail-sheet.tsx`.
+
+### 7.2 `page.tsx` edits to preserve on paste
+
+`app/page.tsx` (now `src/lib/pages/page.tsx`) carries four small additions that must come across verbatim:
+
+- **Imports** — add `HelpCircle` to the existing `lucide-react` import block, and add `import { UserGuideSheet } from "@/components/executive/user-guide-sheet";` next to the other executive-component imports. Rewrite the alias per Phase 3.
+- **`HeaderCard` state** — add `const [guideOpen, setGuideOpen] = useState(false);` alongside the existing `cioOpen` state.
+- **Help button** — render an `IconCircleBtn` containing `<HelpCircle />` between the notifications bell wrapper and the CIO `Popover`. The existing `IconCircleBtn` was extended with an optional `onClick?: () => void` prop — keep that signature; do not refactor back to a no-onClick variant.
+- **Sheet mount** — `HeaderCard` returns a Fragment (`<>...</>`) wrapping the existing top-bar `<div>` plus `<UserGuideSheet open={guideOpen} onOpenChange={setGuideOpen} />` as a sibling. Do not move the sheet element outside `HeaderCard` — it relies on the local `guideOpen` state.
+
+No new hooks, no new context, no new global state. The sheet renders inside the `.src-dashboard` wrapper, so the existing CSS scope continues to apply.
+
+### 7.3 Verification
+
+After `nx serve bps-hub`:
+
+- Click the `?` icon in the header — the sheet should slide in from the right.
+- Confirm the in-sheet TOC anchor links (`#overview`, `#findings`, `#dictionary`, etc.) scroll within the sheet body. The sheet container handles scrolling, not the page; if anchors no-op after the lift-and-shift, the cause is a missing `overflow-y-auto` on `SheetContent` from the host's shadcn primitive.
+- Resize the viewport — the sheet uses the host's standard `Sheet` width (`sm:max-w-2xl w-full`); no library-specific override applies.
+
+---
+
 ## Rough effort budget
 
 | Phase | Time |
@@ -341,6 +375,7 @@ Then visual check in the running host app. Diff `apps/bps-hub/src/**/global*.css
 | 3 (env + font tweaks) | 15 min |
 | 4 (verify globals.css is dropped) | 5 min |
 | 5 (lint/test/build/visual) | 30 min for first green run; budget another 30 for stray import fixes |
+| 7 (user guide sheet wiring) | 10 min — one new file + four `page.tsx` insertions |
 | **Total** | ~3–4 hours assuming the host already has the shadcn set listed in Phase 4 |
 
 Biggest time sink: alias rewrites. After the folder skeleton is in place, a single find-and-replace pass per alias covers most of the 358 occurrences:
