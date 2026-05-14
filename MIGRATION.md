@@ -369,6 +369,8 @@ After `nx serve bps-hub`:
 
 ## Phase 8 — Lever scope dropdown (UI only; data wiring deferred)
 
+> **Update (2026-05-14):** Phase 9.3 supersedes the "UI only" status below. The Lever scope is now wired against `mockVulnerabilities` end-to-end, and `LEVER_OPTIONS` values changed from the `"lever-N"` internal IDs to the `Lever` strings. Read Phase 9.3 *before* Phase 8 when planning the paste.
+
 A new **Lever** scope dropdown sits in the page header immediately to the right of the CIO selector. The dropdown is **UI-only on this branch**: it carries Jordan's four lever options plus an *All Levers* sentinel, but selecting a value does **not yet** filter the grid, KPIs, charts, or side-panel pager. The full integration (raw-value mapping, server-vs-client filtering, URL state, *Unclassified* bucket logic, and the meta-row / inner-header text decisions) is captured in `docs/lever-scope-discovery.md` and lands as a follow-up PR once Roger confirms the field name and raw values.
 
 ### 8.1 New constants file
@@ -408,6 +410,213 @@ Captured in `docs/lever-scope-discovery.md` §4. Open at the time of the migrati
 
 ---
 
+## Phase 9 — Post-discovery feature work (added 2026-05-14)
+
+> **Status:** committed to `feature/migration-for-demo` after the original migration plan was drafted. Everything below must come across to the host — most of it can ride on the file-paste sweep in Phase 2, but a few items need explicit attention. This phase **supersedes Phase 8.5's "deferred" status for the Lever scope**: the scope is now wired end-to-end against `mockVulnerabilities`.
+>
+> **Source commits on this branch:** `9317fb4`, `d0fc1d8`, `8fa69fe`. Use `git log -p <hash>` if a paste discrepancy needs to be triaged.
+
+### 9.1 Filter preset extensions (commit `9317fb4`)
+
+`lib/filter-presets.ts` gained four new triage-status presets:
+
+```ts
+export type FilterPresetId =
+  | "noRemediationDate"
+  | "validationPendingOverThreshold"
+  | "awaitingScan"
+  | "riskAccepted"
+  | "awaitingDisposition"
+  | "inProgress"
+  | "pendingClearScan"
+  | "resolved";
+```
+
+Each new case is a one-line `v.triageStatus === "..."` check in `matchesPreset`. Corresponding entries are also in `FILTER_PRESETS` (label + id).
+
+In `app/page.tsx`, the four primary dashboard `StatCard`s now derive their preset from the card's `triageStatus` via a small lookup table at module scope:
+
+```ts
+const TRIAGE_STATUS_TO_PRESET: Record<TriageStatus, FilterPresetId> = {
+  "Awaiting Disposition": "awaitingDisposition",
+  "In Progress": "inProgress",
+  "Pending Clear Scan": "pendingClearScan",
+  Resolved: "resolved",
+};
+```
+
+Each card's `onNavigate` is wrapped so a card click calls `onApplyFilterPreset(preset)` (which already navigates internally) instead of the bare `onNavigate("vulnerabilities")` used before. Do not call both — calling `onNavigate` redundantly queues a duplicate `setCurrentPage` state update and was implicated in the AG Grid mount race fixed in §9.2.
+
+**`noRemediationDate` semantics changed.** The matchesPreset case now checks `v.dueDate` (the SLA Due Date column the CIO scans) instead of `v.expectedRemediationDate`. The old field was empty whenever no CRQ had been raised, which made the filter match almost every row. Paired with this, mock data was adjusted so rows with `triageStatus === "Awaiting Disposition"` have `dueDate: ""` — that gives the filter a meaningful subset to scope to (see §9.7).
+
+### 9.2 AG Grid 32 selection-API migration (commit `9317fb4`)
+
+**This is the most migration-critical item in Phase 9. Read before pasting `ag-grid-table.tsx`.**
+
+The grid was mixing AG Grid 32's new object-form `rowSelection` API with three legacy column/grid props from v31. AG Grid logs deprecation warnings for each and, more importantly, ends up with null entries in its internal column model, causing `TypeError: Cannot read properties of null (reading 'getColDef')` at first render whenever a code path forces a remount with an external filter already active (e.g., navigating to the grid via a dashboard stat-card click).
+
+**Removed** from `components/executive/ag-grid-table.tsx`:
+
+- The leading explicit checkbox column in `columnDefs` — it had `checkboxSelection: true` and `headerCheckboxSelection: true`. AG Grid 32's `rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true }}` auto-generates an equivalent pinned-left checkbox column.
+- `suppressRowClickSelection={true}` prop — superseded by `rowSelection.enableClickSelection: false`.
+- `enableRangeSelection={true}` prop — superseded by the existing `cellSelection={true}`.
+
+**Kept (with no changes):** the `rowSelection={{ mode: "multiRow", checkboxes: true, headerCheckbox: true, enableClickSelection: false }}` block and `cellSelection={true}`.
+
+**Added** defensive null guards at the two `cols.map(col => col.getColDef())` call sites (the viewport-driven column-state useEffect at ~line 902 and `getExportColumns` at ~line 997):
+
+```ts
+.map((col: any) => {
+  if (!col || typeof col.getColDef !== "function") return null;
+  // ...
+  const def = col.getColDef() as ColDef<Vulnerability>;
+  const field = def?.field as string | undefined;
+  if (!field) return null;
+  // ...
+})
+.filter((s: ColumnState | null): s is ColumnState => s !== null);
+```
+
+Both guards are cheap and protect against the same class of bug if AG Grid hands back a transient null during future state transitions.
+
+**Verification:** the AG Grid console warnings (`checkboxSelection is deprecated`, `headerCheckboxSelection is only supported with rowSelection=multiple`, `suppressRowClickSelection is deprecated`, `enableRangeSelection is deprecated`) must all be gone after paste. If any one reappears, search the host file for the offending prop — the migration likely re-pasted a legacy snippet.
+
+### 9.3 Lever scope wiring (supersedes Phase 8.5; commit `d0fc1d8`)
+
+The Lever scope dropdown documented in Phase 8 as "UI only" is now functional against `mockVulnerabilities`. Five changes span the type, constants, mock data, and grid:
+
+1. **`lib/types.ts`** — added the authoritative `Lever` union (the four exact strings) plus a `LEVERS: Lever[]` value, and added `lever: Lever` to the `Vulnerability` interface:
+
+   ```ts
+   export type Lever =
+     | "CTI/APS&E/EET-Managed Remediation"
+     | "Assessment Underway"
+     | "CIO E2E"
+     | "CIO/CTI Engagement";
+
+   export const LEVERS: Lever[] = [/* same four, in same order */];
+   ```
+
+2. **`lib/constants/levers.ts`** — `LeverScopeValue` was `"all" | "lever-1" | "lever-2" | "lever-3" | "lever-4"` and is now `"all" | Lever`. `LEVER_OPTIONS[].value` values were changed from the `"lever-N"` internal IDs to the four `Lever` strings directly, so the dropdown's selected value can be compared against `row.lever` without an intermediate mapping table. Display labels in `LEVER_OPTIONS` are unchanged (still `"Lever 1 — CTI, APS&E or EET Managed"`, etc.) — only the option `value` field moved.
+
+3. **`lib/mock-data.ts`** — every row now has a `lever`. A 4-cycle `LEVER_DISTRIBUTION` array assigns one of the four values via `i % 4` so the four buckets are ~25% each across the 50 mock rows.
+
+4. **`app/page.tsx`** — derives a nullable `leverScope` from `selectedLever`:
+
+   ```ts
+   const leverScope: Lever | null = selectedLever === "all" ? null : selectedLever;
+   ```
+
+   Passed through `VulnerabilitiesPage` to `AgGridTriageTable` along with an `onClearLeverScope` callback that resets `selectedLever` to `LEVER_SCOPE_ALL`.
+
+5. **`components/executive/ag-grid-table.tsx`** — new optional props `leverScope?: Lever | null` and `onClearLeverScope?: () => void`. `matchesFilters` adds `if (leverScope && v.lever !== leverScope) return false;`. `isExternalFilterPresent` and the `onFilterChanged` re-fire useEffect include `leverScope` in their dependency arrays. The filter chip strip renders an additional removable chip when `leverScope` is set.
+
+When porting, the docstring in Phase 8.1 ("No helpers, no mapping functions yet") no longer applies — Phase 9 stores the field's authoritative values inside the type union itself, which is the helper.
+
+### 9.4 CIO scope wiring (commit `d0fc1d8`)
+
+The header CIO selector was previously cosmetic (changed two pieces of display text — confirmed in `docs/lever-scope-discovery.md` §1.3). It now filters the grid alongside the Lever scope and any filter preset.
+
+- `selectedCio` state is now `(typeof CIO_TEAMS)[0] | null` defaulting to `null` (was `CIO_TEAMS[0]!` — first CIO).
+- "All CIOs" sentinel option added at the top of the CIO popover (mirrors "All Levers"), selecting it sets `selectedCio` to `null`.
+- `HeaderCard` renders no avatar when `selectedCio` is `null`; the trigger text reads `CIO: All CIOs`.
+- `MetaRow`'s `department` text is empty when `selectedCio` is `null` (the old `CIO_DEPARTMENTS` lookup is null-guarded).
+- `VulnerabilitiesPage` inner-header line collapses to `All CIOs · {N} records total` when scope is null.
+- `cioScope: string | null = selectedCio?.name ?? null` is derived in `App`, passed through with `onClearCioScope`, and feeds `matchesFilters` (`if (cioScope && v.cioDisplayName !== cioScope) return false;`).
+
+CIO + Lever + preset all AND together — three independent constraints, no precedence.
+
+### 9.5 Visible Lever column in the grid (commit `8fa69fe`)
+
+`components/executive/ag-grid-table.tsx` gained a visible column at position 8 (immediately after Workstream — both are categorisation/routing fields):
+
+```ts
+{
+  headerName: "Lever",
+  field: "lever",
+  width: 220,
+  filter: "agSetColumnFilter",
+  filterParams: { values: LEVERS },
+  tooltipField: "lever",
+}
+```
+
+The 220px width fits the widest value (`"CTI/APS&E/EET-Managed Remediation"`) without clipping; the `tooltipField` is a safety net for narrower resizes. `LEVERS` is imported as a value from `@/lib/types`. Not added to `TABLET_VISIBLE_FIELDS` — the tablet allowlist is already at 8 entries; users surface the column via the side-panel Columns tool.
+
+### 9.6 Per-field activity log entries (commit `8fa69fe`)
+
+`TriageForm.handleSave` in `components/vulnerability/detail-sheet.tsx` now appends one `ActivityLogEntry` to `vuln.activityLog` per changed field on each save. This is the audit-trail value proposition of the tool, not a UI nicety — port verbatim.
+
+Mechanics:
+
+- The "before" values come from the `vuln` prop, which the form's `useState` initializer captured at mount time. The parent only updates `vuln` *after* `onSave` (the form closes immediately on save), so `vuln` is a stable snapshot of what the user opened the form with.
+- A `diffSpecs` table pairs eleven user-facing labels with their model field names and before/after values: Disposition, CTI Remediation, Identified Blockers, Requested Patch Window, Expected Remediation Date, Re-evaluate by, CRQ #, Remediation Complete and pending clear scan?, Health Check Time, Health Check Complete?, Finding Owner.
+- `expectedRemediationDate` and `reEvaluateBy` are diffed independently — they're sibling fields under different disposition branches, and each carries the label the user actually saw.
+- Array equality (Identified Blockers) uses `JSON.stringify`; scalars use `!==`.
+- `formatValue` renders `(empty)` for empty strings / null / undefined, `(none)` for empty arrays, and comma-separated for non-empty arrays.
+- Action string format: `changed {Label} from "{old}" to "{new}"`. Does **not** include the user name — the `ActivityTab` renders `entry.userName` separately. Prefixing the action would double-print the user.
+- Entry shape exactly matches existing seeded entries in `lib/mock-data.ts`: `id`, `userId`, `userName`, `userInitials`, `action`, `field`, `oldValue`, `newValue`, `timestamp`. IDs are unique per save via `Date.now() + index`.
+- If no fields changed, no entries are appended.
+
+### 9.7 Mock-data adjustments (commits `9317fb4`, `d0fc1d8`)
+
+Two field-level changes inside the `Array.from({ length: 50 }, ...)` factory in `lib/mock-data.ts`:
+
+- `dueDate` is empty when `triageStatus === "Awaiting Disposition"`:
+
+  ```ts
+  dueDate:
+    triageStatus === "Awaiting Disposition"
+      ? ""
+      : daysOpen > 90
+      ? "2026-04-15"
+      : `2026-0${5 + (i % 3)}-${String(10 + (i % 18)).padStart(2, "0")}`,
+  ```
+
+  This drives the "No Remediation Date" dashboard card preset (§9.1). Semantic: a finding still awaiting triage has no SLA Due Date yet.
+
+- `lever` is assigned from `LEVER_DISTRIBUTION` via `i % LEVER_DISTRIBUTION.length` (length 4, ~25% each).
+
+Both changes survive a literal copy of `mock-data.ts` — no special host handling.
+
+### 9.8 Discoverable defects flagged but not addressed in Phase 9
+
+These came out of the UI verification checklist walked on 2026-05-14 and are scope for follow-up PRs, not this migration:
+
+- Dashboard counts (`DASHBOARD_STATS` in `lib/executive-data.ts`) are static. The grid filters now produce real subsets but the stat-card numbers don't recompute from `mockVulnerabilities`. The two should be reconciled in a follow-up.
+- The Top Unresolved component's title still reads "Top Unresolved Vulnerabilities" — should be "Top Unresolved Findings" per the terminology audit.
+- `components/vulnerability/severity-status-chart.tsx`, `charts-panel.tsx`, `status-badge.tsx`, `vulnerability-table.tsx` are orphans (no live consumers; flagged in the audit; produce the only typecheck errors in the repo). They should be deleted before or during migration.
+- The header meta-row Overdue and Priority 1 numbers route to the grid without applying a filter preset. Wiring them mirrors the §9.1 pattern.
+- The "Open in Remedy" button in the detail sheet renders even when CRQ is empty; should be hidden.
+
+### 9.9 Phase 2 paste-order addenda
+
+Slot these into the existing Phase 2 subsections — they don't introduce new file categories, just new content inside existing categories:
+
+| Existing subsection | Addendum |
+|---|---|
+| **2.1 `types/`** | `lib/types.ts` now exports `Lever` (type) and `LEVERS` (value array). Both belong in the same `types/` paste batch. |
+| **2.2 `constants/`** | `lib/constants/levers.ts` — values changed (per §9.3); no new files. |
+| **2.2 `constants/`** | `lib/filter-presets.ts` — four new preset ids and one revised case (per §9.1). |
+| **2.5 `hooks/`** | No change. |
+| **2.6 `components/`** | `components/executive/ag-grid-table.tsx` and `components/vulnerability/detail-sheet.tsx` carry the bulk of Phase 9's runtime changes. Paste after the dashboard cards, before pages. |
+| **2.7 `pages/`** | `app/page.tsx` gains `TRIAGE_STATUS_TO_PRESET`, `cioScope`/`leverScope` derivation, and updated `HeaderCard` / `VulnerabilitiesPage` props (all per §9.1, §9.3, §9.4). |
+
+### 9.10 Verification checklist for the host (delta from Phase 5)
+
+After Phase 5's standard lint/test/build sweep, additionally confirm:
+
+- [ ] No AG Grid deprecation warnings in the browser console (catches §9.2 regressions).
+- [ ] Clicking each of the four primary dashboard stat cards filters the grid to the corresponding triage status and lands a filter chip with the preset label.
+- [ ] Selecting a CIO in the header reduces the grid rows; "All CIOs" restores. Chip appears/disappears accordingly.
+- [ ] Selecting a Lever in the header reduces the grid rows; "All Levers" restores. Chip appears/disappears accordingly.
+- [ ] CIO + Lever + a stat-card preset combined show the intersection of all three constraints.
+- [ ] A Lever column is visible in the grid at position 8 with the correct four-value set filter.
+- [ ] Editing the triage form, saving, and opening the Activity tab shows one entry per changed field (not one combined entry). Re-saving with no changes adds no entries.
+- [ ] The "No Remediation Date" dashboard card click filters the grid to rows with empty Due Date (the Awaiting Disposition subset in the seeded mock data).
+
+---
+
 ## Rough effort budget
 
 | Phase | Time |
@@ -419,7 +628,8 @@ Captured in `docs/lever-scope-discovery.md` §4. Open at the time of the migrati
 | 5 (lint/test/build/visual) | 30 min for first green run; budget another 30 for stray import fixes |
 | 7 (user guide sheet wiring) | 10 min — one new file + four `page.tsx` insertions |
 | 8 (lever dropdown — UI only) | 10 min — one constants file + five `page.tsx` insertions; data wiring is a separate follow-up |
-| **Total** | ~3–4 hours assuming the host already has the shadcn set listed in Phase 4 |
+| 9 (post-discovery feature work) | 30–45 min — most of it rides on the Phase 2 file paste; the AG Grid v32 selection-API cleanup in §9.2 needs explicit verification |
+| **Total** | ~4–5 hours assuming the host already has the shadcn set listed in Phase 4 |
 
 Biggest time sink: alias rewrites. After the folder skeleton is in place, a single find-and-replace pass per alias covers most of the 358 occurrences:
 
