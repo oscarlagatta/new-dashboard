@@ -1249,6 +1249,13 @@ const DIMENSION_TITLES: Record<Dimension, string> = {
   owner: "Findings by Owner",
 };
 
+const TRIAGE_STATUS_TO_PRESET: Record<TriageStatus, FilterPresetId> = {
+  "Awaiting Disposition": "awaitingDisposition",
+  "In Progress": "inProgress",
+  "Pending Clear Scan": "pendingClearScan",
+  Resolved: "resolved",
+};
+
 /** Truncate long labels (app names, full owner names) for the X-axis. */
 function shortDimensionLabel(value: string): string {
   if (value.length <= 14) return value;
@@ -1344,9 +1351,26 @@ function DashboardPage({ stats, onNavigate, vulnerabilities, onApplyFilterPreset
         style={{ display: "flex", gap: 12, alignItems: "stretch" }}
         aria-label="Workload — primary triage-status KPIs"
       >
-        {STAT_CARDS.map((card) => (
-          <StatCard key={card.label} {...card} onNavigate={onNavigate} />
-        ))}
+        {STAT_CARDS.map((card) => {
+          // Each primary card's triageStatus maps 1:1 to a filter preset so
+          // clicking the card scopes the grid to that status (instead of
+          // navigating to an unfiltered grid). onApplyFilterPreset already
+          // sets currentPage="vulnerabilities", so we don't also call
+          // onNavigate — doing so would queue a redundant state update.
+          const preset = card.triageStatus
+            ? TRIAGE_STATUS_TO_PRESET[card.triageStatus]
+            : null;
+          return (
+            <StatCard
+              key={card.label}
+              {...card}
+              onNavigate={(page) => {
+                if (preset) onApplyFilterPreset(preset);
+                else onNavigate(page);
+              }}
+            />
+          );
+        })}
       </section>
 
       {/* Divider separating primary headline KPIs from the lighter

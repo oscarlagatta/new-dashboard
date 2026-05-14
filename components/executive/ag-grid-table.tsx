@@ -438,22 +438,13 @@ export function AgGridTriageTable({
 
   const columnDefs: ColDef<Vulnerability>[] = useMemo(
     () => [
-      // 1. Checkbox
-      {
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
-        width: 44,
-        minWidth: 44,
-        maxWidth: 44,
-        pinned: "left" as const,
-        suppressHeaderMenuButton: true,
-        sortable: false,
-        filter: false,
-        floatingFilter: false,
-        resizable: false,
-        suppressMovable: true,
-      },
-      // 2. Triage Status
+      // NOTE: no explicit checkbox column — AG Grid 32's new rowSelection API
+      // ({ mode: "multiRow", checkboxes: true, headerCheckbox: true }) auto-
+      // generates one. Defining a manual `checkboxSelection: true` column
+      // alongside the new rowSelection object causes AG Grid to produce null
+      // entries in its internal column model, which crashes its renderer
+      // (TypeError: Cannot read properties of null (reading 'getColDef')).
+      // 1. Triage Status
       {
         headerName: "Triage Status",
         field: "triageStatus",
@@ -905,9 +896,13 @@ export function AgGridTriageTable({
     const state: ColumnState[] = cols
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((col: any) => {
+        // AG Grid 32 can return null entries in getColumns() during certain
+        // initial-mount races (e.g., when a saved view applyColumnState runs
+        // in the same commit phase as this effect). Skip them defensively.
+        if (!col || typeof col.getColDef !== "function") return null;
         const colId: string = col.getColId();
         const def = col.getColDef() as ColDef<Vulnerability>;
-        const field = def.field as string | undefined;
+        const field = def?.field as string | undefined;
         // Checkbox / pinned cols without a field — leave alone.
         if (!field) return null;
         if (isTablet) {
@@ -993,15 +988,18 @@ export function AgGridTriageTable({
     return (
       cols
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((col: any) => {
+        .map((col: any): ExportColumnOption | null => {
+          if (!col || typeof col.getColDef !== "function") return null;
           const def = col.getColDef() as ColDef<Vulnerability>;
           return {
             colId: col.getColId() as string,
-            label: (def.headerName as string | undefined) ?? "",
+            label: (def?.headerName as string | undefined) ?? "",
             visible: col.isVisible() as boolean,
           };
         })
-        .filter((c: ExportColumnOption) => c.label.length > 0)
+        .filter((c: ExportColumnOption | null): c is ExportColumnOption =>
+          c !== null && c.label.length > 0,
+        )
     );
   }, []);
 
@@ -1316,9 +1314,7 @@ export function AgGridTriageTable({
                 headerCheckbox: true,
                 enableClickSelection: false,
               }}
-              suppressRowClickSelection={true}
               suppressHorizontalScroll={isTablet}
-              enableRangeSelection={true}
               enableCharts={true}
               cellSelection={true}
               pagination={true}

@@ -399,7 +399,14 @@ export function createMockData(): Vulnerability[] {
       verificationStatus: sourceStatus === "Closed" ? "Verification Passed" : "",
       pastDue,
       daysOpen,
-      dueDate: daysOpen > 90 ? "2026-04-15" : `2026-0${5 + (i % 3)}-${String(10 + (i % 18)).padStart(2, "0")}`,
+      // Awaiting Disposition rows haven't been triaged yet → no SLA Due Date
+      // assigned. Drives the "No Remediation Date" dashboard card.
+      dueDate:
+        triageStatus === "Awaiting Disposition"
+          ? ""
+          : daysOpen > 90
+          ? "2026-04-15"
+          : `2026-0${5 + (i % 3)}-${String(10 + (i % 18)).padStart(2, "0")}`,
       scheduledFixDate: hasCrq ? `2026-05-${String(10 + (i % 7)).padStart(2, "0")}` : "",
       resolvedDate: triageStatus === "Resolved" ? "2026-05-07" : "",
       reportDate: "06/05/2026",

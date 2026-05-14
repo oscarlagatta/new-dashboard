@@ -10,7 +10,11 @@ export type FilterPresetId =
   | "noRemediationDate"
   | "validationPendingOverThreshold"
   | "awaitingScan"
-  | "riskAccepted";
+  | "riskAccepted"
+  | "awaitingDisposition"
+  | "inProgress"
+  | "pendingClearScan"
+  | "resolved";
 
 export interface FilterPresetMeta {
   id: FilterPresetId;
@@ -34,6 +38,22 @@ export const FILTER_PRESETS: Record<FilterPresetId, FilterPresetMeta> = {
     id: "riskAccepted",
     label: "Risk accepted",
   },
+  awaitingDisposition: {
+    id: "awaitingDisposition",
+    label: "Awaiting Disposition",
+  },
+  inProgress: {
+    id: "inProgress",
+    label: "In Progress",
+  },
+  pendingClearScan: {
+    id: "pendingClearScan",
+    label: "Pending Clear Scan",
+  },
+  resolved: {
+    id: "resolved",
+    label: "Resolved",
+  },
 };
 
 export function matchesPreset(
@@ -43,7 +63,12 @@ export function matchesPreset(
 ): boolean {
   switch (preset) {
     case "noRemediationDate":
-      return !v.expectedRemediationDate || v.expectedRemediationDate.trim() === "";
+      // The "No Remediation Date" dashboard card scopes to the visible
+      // Due Date column — the SLA deadline a CIO scans for. Using the
+      // user-set expectedRemediationDate previously matched almost every
+      // row (it's empty whenever a CRQ hasn't been raised yet) and made
+      // the filter feel like a no-op.
+      return !v.dueDate || v.dueDate.trim() === "";
     case "validationPendingOverThreshold":
       // Spec says "Validation Pending"; the data model uses "Pending Clear Scan".
       return (
@@ -57,6 +82,14 @@ export function matchesPreset(
       return v.remediationPendingClearScan === "Yes" && v.status === "Open";
     case "riskAccepted":
       return v.disposition === "Accept Risk";
+    case "awaitingDisposition":
+      return v.triageStatus === "Awaiting Disposition";
+    case "inProgress":
+      return v.triageStatus === "In Progress";
+    case "pendingClearScan":
+      return v.triageStatus === "Pending Clear Scan";
+    case "resolved":
+      return v.triageStatus === "Resolved";
   }
 }
 

@@ -54,7 +54,11 @@
       "Bash(python3 .claude/skills/ui-ux-pro-max/scripts/search.py \"executive dashboard KPI summary cards row count layout\" --domain ux -n 6)",
       "Bash(git *)",
       "Bash(grep -E \"\\(user-guide-sheet|app/page|app\\\\\\\\\\\\\\\\page\\)\")",
-      "Bash(grep -E \"\\(app[/\\\\\\\\\\\\\\\\]page|levers\\)\")"
+      "Bash(grep -E \"\\(app[/\\\\\\\\\\\\\\\\]page|levers\\)\")",
+      "Bash(grep -rn \"\\\\\"Vulnerab\\\\|'Vulnerab\\\\|>Vulnerab\\\\|\\\\`Vulnerab\" --include=\"*.tsx\" --include=\"*.ts\" D:/sandbox/new-dashboard/app D:/sandbox/new-dashboard/components D:/sandbox/new-dashboard/lib D:/sandbox/new-dashboard/hooks)",
+      "Bash(tee /tmp/dev.log)",
+      "Read(//tmp/**)",
+      "Bash(tee D:/sandbox/new-dashboard/.devlog)"
     ]
   }
 }
