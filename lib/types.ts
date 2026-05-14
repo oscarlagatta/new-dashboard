@@ -41,6 +41,21 @@ export type Source =
   | "Cloud Config Compliance"
   | "Nextgen BMP";
 
+// Authoritative remediation lever — every finding belongs to exactly one.
+// See docs/lever-scope-discovery.md for context on the four-value taxonomy.
+export type Lever =
+  | "CTI/APS&E/EET-Managed Remediation"
+  | "Assessment Underway"
+  | "CIO E2E"
+  | "CIO/CTI Engagement";
+
+export const LEVERS: Lever[] = [
+  "CTI/APS&E/EET-Managed Remediation",
+  "Assessment Underway",
+  "CIO E2E",
+  "CIO/CTI Engagement",
+];
+
 export type Blocker =
   | "Vendor / internal package availability"
   | "Testing and partner / peer team dependencies"
@@ -110,6 +125,7 @@ export interface Vulnerability {
   status: SourceStatus;
   workstream: Workstream;
   source: Source;
+  lever: Lever;
   operatingEnvironment: OperatingEnvironment;
   hostName: string;
   fqdn: string;

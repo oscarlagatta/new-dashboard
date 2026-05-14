@@ -5,6 +5,7 @@ import type {
   SourceStatus,
   Workstream,
   Source,
+  Lever,
   OperatingEnvironment,
   Disposition,
   Blocker,
@@ -168,6 +169,16 @@ const VULN_OWNERS = [
 const CIO_NAMES = [
   "James Hartley", "Patricia Owens", "Raj Mehta",
   "Sandra Corrigan", "Marcus Webb", "Claire Fontaine", "Derek Okonkwo",
+];
+
+// Distribution of remediation levers across the 50 mock rows. Indexed by i % 4
+// to give a roughly even spread (~13/13/12/12 = ~25% each) so each filtered
+// subset is visibly different but no single lever dominates.
+const LEVER_DISTRIBUTION: Lever[] = [
+  "CTI/APS&E/EET-Managed Remediation",
+  "Assessment Underway",
+  "CIO E2E",
+  "CIO/CTI Engagement",
 ];
 
 const CTO_NAMES = [
@@ -368,6 +379,7 @@ export function createMockData(): Vulnerability[] {
       status: sourceStatus,
       workstream,
       source,
+      lever: LEVER_DISTRIBUTION[i % LEVER_DISTRIBUTION.length]!,
       operatingEnvironment: opEnv,
       hostName,
       fqdn: hostName.toLowerCase().replace(/ /g, "-").split(":")[1] ?? hostName.toLowerCase(),

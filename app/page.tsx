@@ -49,7 +49,7 @@ import {
   LEVER_SCOPE_ALL,
   type LeverScopeValue,
 } from "@/lib/constants/levers";
-import type { Vulnerability, TriageStatus } from "@/lib/types";
+import type { Vulnerability, TriageStatus, Lever } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
 import { useViewport } from "@/lib/use-viewport";
 import { DEFAULT_DASHBOARD_SETTINGS } from "@/lib/dashboard-settings";
@@ -506,8 +506,8 @@ interface HeaderStats {
 }
 
 interface HeaderCardProps {
-  selectedCio: (typeof CIO_TEAMS)[0];
-  onSelectCio: (cio: (typeof CIO_TEAMS)[0]) => void;
+  selectedCio: (typeof CIO_TEAMS)[0] | null;
+  onSelectCio: (cio: (typeof CIO_TEAMS)[0] | null) => void;
   selectedLever: LeverScopeValue;
   onSelectLever: (value: LeverScopeValue) => void;
   stats: HeaderStats;
@@ -529,8 +529,12 @@ function HeaderCard({
   const [cioOpen, setCioOpen] = useState(false);
   const [leverOpen, setLeverOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-  const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
-  const initials = getInitials(selectedCio.name);
+  // null scope ("All CIOs") shows no department in the meta-row and no
+  // avatar in the trigger pill.
+  const department = selectedCio
+    ? CIO_DEPARTMENTS[selectedCio.name] ?? "Technology"
+    : "";
+  const initials = selectedCio ? getInitials(selectedCio.name) : "";
 
   // Trigger label: "All" for the sentinel, or the option label with the
   // redundant leading "Lever " stripped — so the full chip reads
@@ -679,9 +683,9 @@ function HeaderCard({
               onMouseLeave={(e) =>
                 ((e.currentTarget as HTMLButtonElement).style.background = "#FAFAFA")
               }
-              aria-label={`Select CIO team. Current: ${selectedCio.name}`}
+              aria-label={`Select CIO team. Current: ${selectedCio?.name ?? "All CIOs"}`}
             >
-              <Avatar initials={initials} size={32} />
+              {selectedCio && <Avatar initials={initials} size={32} />}
               <span
                 className="vrd-header-cio-name"
                 style={{
@@ -691,7 +695,7 @@ function HeaderCard({
                   whiteSpace: "nowrap",
                 }}
               >
-                CIO: {selectedCio.name}
+                CIO: {selectedCio?.name ?? "All CIOs"}
               </span>
               <ChevronDown
                 className="vrd-header-cio-chevron"
@@ -701,6 +705,39 @@ function HeaderCard({
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-56 p-1" align="end">
+            {/* "All CIOs" sentinel — clears the scope, mirroring the
+                "All Levers" pattern on the Lever dropdown. */}
+            <button
+              onClick={() => {
+                onSelectCio(null);
+                setCioOpen(false);
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors"
+              style={{ border: "none", background: "transparent", cursor: "pointer" }}
+              aria-label="Show all CIOs (clear scope)"
+            >
+              <span
+                style={{
+                  flex: 1,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#111827",
+                  textAlign: "left",
+                }}
+              >
+                All CIOs
+              </span>
+              {!selectedCio && (
+                <Check
+                  style={{ width: 14, height: 14, color: "#2563EB" }}
+                  aria-hidden="true"
+                />
+              )}
+            </button>
+            <div
+              style={{ height: 1, background: "#F3F4F6", margin: "4px 0" }}
+              aria-hidden="true"
+            />
             {CIO_TEAMS.map((cio) => (
               <button
                 key={cio.id}
@@ -718,7 +755,7 @@ function HeaderCard({
                 >
                   {cio.name}
                 </span>
-                {cio.id === selectedCio.id && (
+                {cio.id === selectedCio?.id && (
                   <Check
                     style={{ width: 14, height: 14, color: "#2563EB" }}
                     aria-hidden="true"
@@ -1726,10 +1763,14 @@ interface VulnerabilitiesPageProps {
   onRowSelected: (v: Vulnerability) => void;
   onSheetChange: (open: boolean) => void;
   onSave: (v: Vulnerability) => void;
-  selectedCio: (typeof CIO_TEAMS)[0];
+  selectedCio: (typeof CIO_TEAMS)[0] | null;
   stats: { total: number };
   filterPreset: FilterPresetId | null;
   onClearFilterPreset: () => void;
+  cioScope: string | null;
+  leverScope: Lever | null;
+  onClearCioScope: () => void;
+  onClearLeverScope: () => void;
 }
 
 function VulnerabilitiesPage({
@@ -1743,8 +1784,14 @@ function VulnerabilitiesPage({
   stats,
   filterPreset,
   onClearFilterPreset,
+  cioScope,
+  leverScope,
+  onClearCioScope,
+  onClearLeverScope,
 }: VulnerabilitiesPageProps) {
-  const department = CIO_DEPARTMENTS[selectedCio.name] ?? "Technology";
+  const department = selectedCio
+    ? CIO_DEPARTMENTS[selectedCio.name] ?? "Technology"
+    : "";
 
   return (
     <div
@@ -1784,7 +1831,10 @@ function VulnerabilitiesPage({
           All Findings
         </h2>
         <p style={{ fontSize: 13, color: "#6B7280", margin: "3px 0 0" }}>
-          {selectedCio.name} · {department} · {formatCount(stats.total)} records total
+          {selectedCio
+            ? `${selectedCio.name} · ${department} · `
+            : "All CIOs · "}
+          {formatCount(stats.total)} records total
         </p>
       </div>
 
@@ -1811,6 +1861,10 @@ function VulnerabilitiesPage({
           filterPreset={filterPreset}
           settings={DEFAULT_DASHBOARD_SETTINGS}
           onClearFilterPreset={onClearFilterPreset}
+          cioScope={cioScope}
+          leverScope={leverScope}
+          onClearCioScope={onClearCioScope}
+          onClearLeverScope={onClearLeverScope}
         />
       </div>
     </div>
@@ -1823,8 +1877,12 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedCio, setSelectedCio] = useState(CIO_TEAMS[0]!);
+  const [selectedCio, setSelectedCio] = useState<(typeof CIO_TEAMS)[0] | null>(null);
   const [selectedLever, setSelectedLever] = useState<LeverScopeValue>(LEVER_SCOPE_ALL);
+  // Derived scopes — `null` means "no scope" for both. These feed the grid's
+  // external filter alongside any active filter preset.
+  const cioScope = selectedCio?.name ?? null;
+  const leverScope: Lever | null = selectedLever === "all" ? null : selectedLever;
   const [selectedVuln, setSelectedVuln] = useState<Vulnerability | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   // Pending preset is set from the dashboard cards / Action Required rows and
@@ -1862,6 +1920,11 @@ export default function App() {
   }, []);
 
   const onClearFilterPreset = useCallback(() => setFilterPreset(null), []);
+  const onClearCioScope = useCallback(() => setSelectedCio(null), []);
+  const onClearLeverScope = useCallback(
+    () => setSelectedLever(LEVER_SCOPE_ALL),
+    [],
+  );
 
   const onRowSelected = useCallback((v: Vulnerability) => {
     setSelectedVuln(v);
@@ -1940,6 +2003,10 @@ export default function App() {
               stats={stats}
               filterPreset={filterPreset}
               onClearFilterPreset={onClearFilterPreset}
+              cioScope={cioScope}
+              leverScope={leverScope}
+              onClearCioScope={onClearCioScope}
+              onClearLeverScope={onClearLeverScope}
             />
           )}
         </main>

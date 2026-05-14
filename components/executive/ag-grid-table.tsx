@@ -58,7 +58,8 @@ import {
   DispositionCellRenderer,
   TechnologyCellRenderer,
 } from "@/components/ag-grid/cell-renderers";
-import type { Vulnerability, Disposition } from "@/lib/types";
+import type { Vulnerability, Disposition, Lever } from "@/lib/types";
+import { LEVERS } from "@/lib/types";
 import { USERS } from "@/lib/mock-data";
 import "@/lib/ag-grid-setup";
 import { useSavedViews } from "@/hooks/use-saved-views";
@@ -344,6 +345,14 @@ interface Props {
   settings?: DashboardSettings;
   /** Notify the parent so it can clear the preset (e.g., when user hits "Clear all"). */
   onClearFilterPreset?: () => void;
+  /** Header CIO scope — filters rows by cioDisplayName. Null = no scope. */
+  cioScope?: string | null;
+  /** Header Lever scope — filters rows by lever. Null = no scope. */
+  leverScope?: Lever | null;
+  /** Clear the CIO scope (× on its chip, or Clear all). */
+  onClearCioScope?: () => void;
+  /** Clear the Lever scope (× on its chip, or Clear all). */
+  onClearLeverScope?: () => void;
 }
 
 export function AgGridTriageTable({
@@ -356,6 +365,10 @@ export function AgGridTriageTable({
   filterPreset = null,
   settings = DEFAULT_DASHBOARD_SETTINGS,
   onClearFilterPreset,
+  cioScope = null,
+  leverScope = null,
+  onClearCioScope,
+  onClearLeverScope,
 }: Props) {
   const gridRef = useRef<AgGridReact>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -405,15 +418,19 @@ export function AgGridTriageTable({
         if (!vals.has(cell)) return false;
       }
       if (filterPreset && !matchesPreset(v, filterPreset, settings)) return false;
+      // Header CIO and Lever scopes AND with the toolbar filters and preset.
+      if (cioScope && v.cioDisplayName !== cioScope) return false;
+      if (leverScope && v.lever !== leverScope) return false;
       return true;
     },
-    [filters, filterPreset, settings]
+    [filters, filterPreset, settings, cioScope, leverScope]
   );
 
   // Apply external filters via grid's external filter mechanism
   const isExternalFilterPresent = useCallback(
-    () => activeFilters.length > 0 || !!filterPreset,
-    [activeFilters, filterPreset]
+    () =>
+      activeFilters.length > 0 || !!filterPreset || !!cioScope || !!leverScope,
+    [activeFilters, filterPreset, cioScope, leverScope]
   );
 
   const doesExternalFilterPass = useCallback(
@@ -502,7 +519,18 @@ export function AgGridTriageTable({
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.workstream },
       },
-      // 8. Technology (combined)
+      // 8. Lever — categorisation sibling of Workstream; widest value
+      //    ("CTI/APS&E/EET-Managed Remediation") fits at 220px, tooltip
+      //    rescues anything that gets clipped further.
+      {
+        headerName: "Lever",
+        field: "lever",
+        width: 220,
+        filter: "agSetColumnFilter",
+        filterParams: { values: LEVERS },
+        tooltipField: "lever",
+      },
+      // 9. Technology (combined)
       {
         headerName: "Technology",
         colId: "technology",
@@ -944,13 +972,13 @@ export function AgGridTriageTable({
     }
   }, [quickFilter]);
 
-  // External filter notify — both toolbar filters and the preset are
-  // external filters, so either one changing must re-evaluate every row.
+  // External filter notify — toolbar filters, the preset, and the two header
+  // scopes are all external filters, so any change must re-evaluate rows.
   useEffect(() => {
     if (gridRef.current?.api) {
       gridRef.current.api.onFilterChanged();
     }
-  }, [filters, filterPreset]);
+  }, [filters, filterPreset, cioScope, leverScope]);
 
   const clearAllFilters = useCallback(() => {
     setFilters(
@@ -960,10 +988,12 @@ export function AgGridTriageTable({
     );
     setQuickFilter("");
     onClearFilterPreset?.();
+    onClearCioScope?.();
+    onClearLeverScope?.();
     if (gridRef.current?.api) {
       gridRef.current.api.setFilterModel(null);
     }
-  }, [onClearFilterPreset]);
+  }, [onClearFilterPreset, onClearCioScope, onClearLeverScope]);
 
   const clearSelection = useCallback(() => {
     gridRef.current?.api?.deselectAll();
@@ -1219,7 +1249,11 @@ export function AgGridTriageTable({
         </div>
 
         {/* Active filter chips */}
-        {(activeFilters.length > 0 || quickFilter || filterPreset) && (
+        {(activeFilters.length > 0 ||
+          quickFilter ||
+          filterPreset ||
+          cioScope ||
+          leverScope) && (
           <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
             {filterPreset && (
               <span
@@ -1231,6 +1265,36 @@ export function AgGridTriageTable({
                   className="hover:text-destructive transition-colors"
                   onClick={() => onClearFilterPreset?.()}
                   aria-label={`Remove ${FILTER_PRESETS[filterPreset].label} filter`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {cioScope && (
+              <span
+                key={`cio-scope-${cioScope}`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium"
+              >
+                CIO: {cioScope}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => onClearCioScope?.()}
+                  aria-label={`Remove CIO scope ${cioScope}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {leverScope && (
+              <span
+                key={`lever-scope-${leverScope}`}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium"
+              >
+                Lever: {leverScope}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => onClearLeverScope?.()}
+                  aria-label={`Remove Lever scope ${leverScope}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
