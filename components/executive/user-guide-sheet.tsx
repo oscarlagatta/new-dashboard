@@ -476,7 +476,14 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
               <Item>
                 <Term>CIO selector</Term> — switch which CIO team's findings are
                 shown. The selection scopes the entire dashboard and the Findings
-                grid.
+                grid. Pick <Term>All CIOs</Term> at the top of the dropdown to
+                clear the scope and see every team's findings.
+              </Item>
+              <Item>
+                <Term>Lever selector</Term> — scope the dashboard and Findings
+                grid to a single remediation lever (CTI / APS&E / EET-Managed,
+                Assessment Underway, CIO E2E, or CIO / CTI Engagement). Pick{" "}
+                <Term>All Levers</Term> to clear the scope.
               </Item>
             </List>
           </Section>
@@ -559,10 +566,11 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
 
             <SubHeading>Active filter chips</SubHeading>
             <Paragraph>
-              When any filter is active (preset, multi-select, or search), a row
-              of removable chips appears under the toolbar. Click an{" "}
-              <Kbd>×</Kbd> on a chip to remove that single value, or click{" "}
-              <Term>Clear all</Term> to reset everything.
+              When any filter is active (preset, multi-select, search, or the
+              header CIO / Lever scope), a row of removable chips appears under
+              the toolbar. Click an <Kbd>×</Kbd> on a chip to remove that single
+              value, or click <Term>Clear all</Term> to reset every filter
+              including the header scopes.
             </Paragraph>
 
             <SubHeading>Status bar at the bottom</SubHeading>
@@ -841,8 +849,10 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
                 exception data, scorecard, and reference IDs.
               </Item>
               <Item>
-                <Term>Activity tab</Term> — chronological audit log of changes,
-                with a count badge.
+                <Term>Activity tab</Term> — chronological audit log with a count
+                badge. Every triage save records <em>one entry per changed
+                field</em> (with before / after values), so the trail shows
+                exactly what moved.
               </Item>
               <Item>
                 <Term>Footer</Term> — Triage toggle, Save / Cancel when the
@@ -914,7 +924,9 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
               </Item>
               <Item>
                 Click <Term>Save</Term>. The triage panel collapses and the
-                finding's status updates. An entry is added to the Activity log.
+                finding's status updates. One audit entry is added to the
+                Activity log for each field you changed (Disposition, CRQ #,
+                Owner, etc.), each showing the old and new value.
               </Item>
               <Item>
                 Use <Kbd>k</Kbd> (or the right-arrow button) to advance to the
@@ -1112,6 +1124,11 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
                 term="Subcategory"
                 meaning="Classification (e.g. Missing Patch, Misconfiguration, EOL Software)."
                 impact="EOL Software dispositions almost never resolve via Fix in isolation — usually paired with Decommission."
+              />
+              <DictEntry
+                term="Lever"
+                meaning="Authoritative remediation lever — one of CTI/APS&E/EET-Managed Remediation, Assessment Underway, CIO E2E, or CIO/CTI Engagement. Every finding belongs to exactly one."
+                impact="Tells you which team owns the work and the engagement model. Filter the grid by Lever (toolbar column filter or the header Lever selector) to focus on the queue you're responsible for."
               />
               <DictEntry
                 term="Technology + Version"
@@ -1424,9 +1441,11 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
                 <Term>Show / hide</Term> — open the right-side tool panel
                 (
                 <Columns3 style={{ width: 12, height: 12, display: "inline", verticalAlign: "middle" }} />{" "}
-                Columns) and toggle checkboxes. Many extra columns are hidden by
-                default: Report Date, GIS ID, Qualys ID, Application Full Name,
-                FQDN, IP Addresses, ERP exception fields, OS Name, and more.
+                Columns) and toggle checkboxes. The <Term>Lever</Term> column
+                appears right after Workstream and is visible by default. Many
+                extra columns are hidden by default: Report Date, GIS ID,
+                Qualys ID, Application Full Name, FQDN, IP Addresses, ERP
+                exception fields, OS Name, and more.
               </Item>
               <Item>
                 On tablet width the grid auto-fits a lean column set; toggling
@@ -1745,7 +1764,12 @@ export function UserGuideSheet({ open, onOpenChange }: UserGuideSheetProps) {
               </Item>
               <Item>
                 <Term>CIO selector</Term> — re-scopes every page to that CIO's
-                findings.
+                findings, or to <em>All CIOs</em> to clear the scope.
+              </Item>
+              <Item>
+                <Term>Lever selector</Term> — re-scopes the grid to a single
+                remediation lever. Appears as its own removable chip on the
+                Findings toolbar.
               </Item>
               <Item>
                 <Term>Right-click → Filter by this value</Term> — populate the
