@@ -61,7 +61,9 @@
       "Bash(tee D:/sandbox/new-dashboard/.devlog)",
       "Bash(Get-ChildItem -Path \"D:\\\\sandbox\\\\new-dashboard\" -Recurse -Depth 2)",
       "Bash(Select-Object -First 50)",
-      "Bash(Format-Table FullName, PSIsContainer)"
+      "Bash(Format-Table FullName, PSIsContainer)",
+      "Bash(npx --no-install eslint .)",
+      "Bash(npx --no-install tsc --noEmit)"
     ]
   }
 }

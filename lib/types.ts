@@ -16,6 +16,17 @@ export type SeverityRisk =
 export type SourceStatus = "Open" | "Closed";
 
 export type Disposition =
+  // Spec values
+  | "CIO ACTION – Need Requested Patch Window"
+  | "CIO ACTION – App Team will Remediate"
+  | "CIO ACTION – App Team identify blocker"
+  | "CIO ACTION – Request Self-Service Package (Not Automatically Pushed by PCC)"
+  | "CIO INFORM – LLE force patch on Midweek at 10PM ET for AMRS (APAC 10AM ET, EMEA 8PM ET)"
+  | "CIO REVIEW – PCC will patch under established RMW"
+  | "NO IMMEDIATE ACTION – No Patch Available, waiting for patch"
+  | "NO IMMEDIATE ACTION – CTI AIT"
+  | "TEAM 1 ACTION – Baseline ESM-OS Remediation Team"
+  // Legacy values (preserved)
   | "Fix"
   | "Defer"
   | "Mitigate"
@@ -66,7 +77,8 @@ export type Blocker =
   | "Hosting Capacity"
   | "No patch available"
   | "False positives in Vulnerability and FOSS data"
-  | "Data and reporting limitations";
+  | "Data and reporting limitations"
+  | "Other (please provide detail)";
 
 export const BLOCKERS: Blocker[] = [
   "Vendor / internal package availability",
@@ -79,28 +91,25 @@ export const BLOCKERS: Blocker[] = [
   "No patch available",
   "False positives in Vulnerability and FOSS data",
   "Data and reporting limitations",
+  "Other (please provide detail)",
 ];
 
-export const PATCH_WINDOWS = [
-  "Sat 5/9 00:00–08:00 ET",
-  "Sat 5/9 08:00–16:00 ET",
-  "Sat 5/9 16:00–23:59 ET",
-  "Sun 5/10 00:00–08:00 ET",
-  "Sun 5/10 08:00–16:00 ET",
-  "Sun 5/10 16:00–23:59 ET",
-  "Mon 5/11 00:00–08:00 ET",
-  "Sat 5/16 00:00–08:00 ET",
-  "Sat 5/16 08:00–16:00 ET",
-  "Sun 5/17 00:00–08:00 ET",
-  "Sun 5/17 08:00–16:00 ET",
-];
-
-export const DISPOSITIONS: Disposition[] = [
-  "Fix",
-  "Defer",
-  "Mitigate",
-  "Accept Risk",
-  "False Positive",
+export const DISPOSITIONS: { label: string; value: Disposition; group: "spec" | "legacy" }[] = [
+  { label: "CIO ACTION – Need Requested Patch Window", value: "CIO ACTION – Need Requested Patch Window", group: "spec" },
+  { label: "CIO ACTION – App Team will Remediate", value: "CIO ACTION – App Team will Remediate", group: "spec" },
+  { label: "CIO ACTION – App Team identify blocker", value: "CIO ACTION – App Team identify blocker", group: "spec" },
+  { label: "CIO ACTION – Request Self-Service Package (Not Automatically Pushed by PCC)", value: "CIO ACTION – Request Self-Service Package (Not Automatically Pushed by PCC)", group: "spec" },
+  { label: "CIO INFORM – LLE force patch on Midweek at 10PM ET for AMRS (APAC 10AM ET, EMEA 8PM ET)", value: "CIO INFORM – LLE force patch on Midweek at 10PM ET for AMRS (APAC 10AM ET, EMEA 8PM ET)", group: "spec" },
+  { label: "CIO REVIEW – PCC will patch under established RMW", value: "CIO REVIEW – PCC will patch under established RMW", group: "spec" },
+  { label: "NO IMMEDIATE ACTION – No Patch Available, waiting for patch", value: "NO IMMEDIATE ACTION – No Patch Available, waiting for patch", group: "spec" },
+  { label: "NO IMMEDIATE ACTION – CTI AIT", value: "NO IMMEDIATE ACTION – CTI AIT", group: "spec" },
+  { label: "TEAM 1 ACTION – Baseline ESM-OS Remediation Team", value: "TEAM 1 ACTION – Baseline ESM-OS Remediation Team", group: "spec" },
+  // Legacy
+  { label: "Fix", value: "Fix", group: "legacy" },
+  { label: "Defer", value: "Defer", group: "legacy" },
+  { label: "Mitigate", value: "Mitigate", group: "legacy" },
+  { label: "Accept Risk", value: "Accept Risk", group: "legacy" },
+  { label: "False Positive", value: "False Positive", group: "legacy" },
 ];
 
 export interface ActivityLogEntry {
@@ -117,6 +126,7 @@ export interface ActivityLogEntry {
 
 export interface Vulnerability {
   // Source data (read-only from Hadoop/Roger's DB)
+  obiid: string;
   id: string;
   qualysId: number;
   cve: string;
@@ -215,6 +225,7 @@ export interface Vulnerability {
   // Triage state (written by this UI)
   triageStatus: TriageStatus;
   disposition: Disposition;
+  rcManagingTeam: string;
   ctiRemediation: "Yes" | "No" | "";
   requestedPatchWindow: string;
   expectedRemediationDate: string;
@@ -223,6 +234,7 @@ export interface Vulnerability {
   healthCheckTime: string;
   healthCheckComplete: "Yes" | "No" | "";
   identifiedBlockers: Blocker[];
+  otherBlockerDetail: string;
   falsePositiveReason: string;
   deferralJustification: string;
   reEvaluateBy: string;

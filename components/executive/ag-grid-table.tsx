@@ -59,7 +59,7 @@ import {
   TechnologyCellRenderer,
 } from "@/components/ag-grid/cell-renderers";
 import type { Vulnerability, Disposition, Lever } from "@/lib/types";
-import { LEVERS } from "@/lib/types";
+import { LEVERS, DISPOSITIONS } from "@/lib/types";
 import { USERS } from "@/lib/mock-data";
 import "@/lib/ag-grid-setup";
 import { useSavedViews } from "@/hooks/use-saved-views";
@@ -192,7 +192,9 @@ function MultiSelectPopover({ label, options, selected, onChange }: MultiSelectP
 
 // ── Bulk Action Bar ────────────────────────────────────────────────────────────
 
-const DISPOSITION_OPTIONS = ["Fix", "Defer", "Mitigate", "Accept Risk", "False Positive"] as const;
+// Mirrors lib/types.ts DISPOSITIONS — spec values first, then legacy.
+// Pulled directly from the central constant so the bulk-action menu stays in
+// lockstep with the per-row form dropdown.
 
 interface BulkActionBarProps {
   selectedCount: number;
@@ -281,7 +283,7 @@ function BulkActionBar({
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-44 p-1"
+                className="w-[28rem] p-1 max-h-[60vh] overflow-y-auto"
                 align="start"
                 side="top"
                 sideOffset={8}
@@ -289,16 +291,34 @@ function BulkActionBar({
                 <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1">
                   Set to
                 </div>
-                {DISPOSITION_OPTIONS.map((d) => (
+                {DISPOSITIONS.filter((d) => d.group === "spec").map((d) => (
                   <button
-                    key={d}
+                    key={d.value}
                     className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors"
                     onClick={() => {
-                      onSetDisposition(d);
+                      onSetDisposition(d.value);
                       setDispositionOpen(false);
                     }}
                   >
-                    {d}
+                    {d.label}
+                  </button>
+                ))}
+                <div
+                  aria-hidden="true"
+                  className="px-2 py-1 text-[11px] text-muted-foreground/60 select-none"
+                >
+                  ──────────
+                </div>
+                {DISPOSITIONS.filter((d) => d.group === "legacy").map((d) => (
+                  <button
+                    key={d.value}
+                    className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors"
+                    onClick={() => {
+                      onSetDisposition(d.value);
+                      setDispositionOpen(false);
+                    }}
+                  >
+                    {d.label}
                   </button>
                 ))}
               </PopoverContent>
@@ -1111,10 +1131,17 @@ export function AgGridTriageTable({
         },
         {
           name: "Set Disposition",
-          subMenu: DISPOSITION_OPTIONS.map((d) => ({
-            name: d,
-            action: () => bulkSetDisposition(d),
-          })),
+          subMenu: [
+            ...DISPOSITIONS.filter((d) => d.group === "spec").map((d) => ({
+              name: d.label,
+              action: () => bulkSetDisposition(d.value),
+            })),
+            "separator" as const,
+            ...DISPOSITIONS.filter((d) => d.group === "legacy").map((d) => ({
+              name: d.label,
+              action: () => bulkSetDisposition(d.value),
+            })),
+          ],
         }
       );
 

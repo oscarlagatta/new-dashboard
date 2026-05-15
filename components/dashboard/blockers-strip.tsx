@@ -22,6 +22,7 @@ const BLOCKER_SHORT_LABELS: Record<Blocker, string> = {
   "No patch available": "No patch",
   "False positives in Vulnerability and FOSS data": "FP / FOSS data",
   "Data and reporting limitations": "Data / reporting",
+  "Other (please provide detail)": "Other",
 };
 
 function aggregate(vulns: Vulnerability[]) {

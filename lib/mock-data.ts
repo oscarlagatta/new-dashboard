@@ -370,7 +370,16 @@ export function createMockData(): Vulnerability[] {
         ? BLOCKER_DISTRIBUTION[i % BLOCKER_DISTRIBUTION.length] ?? []
         : [];
 
+    const rcManagingTeams = [
+      "Linux Patch Ops",
+      "Windows Endpoint",
+      "Cloud Infra",
+      "App Security",
+      "Network Ops",
+    ];
+
     return {
+      obiid: `OBIID-${String(i).padStart(8, "0")}`,
       id: `vuln-${String(i + 1).padStart(3, "0")}`,
       qualysId: 10000 + i + 1,
       cve,
@@ -476,6 +485,8 @@ export function createMockData(): Vulnerability[] {
       // Triage fields
       triageStatus,
       disposition,
+      rcManagingTeam: rcManagingTeams[i % rcManagingTeams.length] ?? "",
+      otherBlockerDetail: "",
       ctiRemediation: triageStatus === "Awaiting Disposition" ? "" : i % 2 === 0 ? "Yes" : "No",
       requestedPatchWindow: hasCrq ? (["Sat 5/9 00:00–08:00 ET", "Sat 5/9 08:00–16:00 ET", "Sun 5/10 00:00–08:00 ET"][i % 3] ?? "") : "",
       expectedRemediationDate: hasCrq ? `2026-05-${String(10 + (i % 7)).padStart(2, "0")}` : "",
