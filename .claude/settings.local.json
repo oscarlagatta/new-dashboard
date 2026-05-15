@@ -58,7 +58,10 @@
       "Bash(grep -rn \"\\\\\"Vulnerab\\\\|'Vulnerab\\\\|>Vulnerab\\\\|\\\\`Vulnerab\" --include=\"*.tsx\" --include=\"*.ts\" D:/sandbox/new-dashboard/app D:/sandbox/new-dashboard/components D:/sandbox/new-dashboard/lib D:/sandbox/new-dashboard/hooks)",
       "Bash(tee /tmp/dev.log)",
       "Read(//tmp/**)",
-      "Bash(tee D:/sandbox/new-dashboard/.devlog)"
+      "Bash(tee D:/sandbox/new-dashboard/.devlog)",
+      "Bash(Get-ChildItem -Path \"D:\\\\sandbox\\\\new-dashboard\" -Recurse -Depth 2)",
+      "Bash(Select-Object -First 50)",
+      "Bash(Format-Table FullName, PSIsContainer)"
     ]
   }
 }
