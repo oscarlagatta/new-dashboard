@@ -617,6 +617,54 @@ After Phase 5's standard lint/test/build sweep, additionally confirm:
 
 ---
 
+## Phase 10 — Left navigation menu restructure (added 2026-05-18)
+
+> **Status:** uncommitted on `feature/migration-for-demo` at the time of writing — a working-tree change to `app/page.tsx` only. Rides entirely on the Phase 2.7 page paste; no new files, no new runtime dependencies, no routing changes.
+
+The hand-rolled page-level sidebar (Phase 6 gotcha #11 — the one *not* built on the shadcn `sidebar` primitive) was restructured into a six-item "Main Pages" menu with two-line nav entries. Every change is confined to `app/page.tsx` (→ `src/lib/pages/page.tsx`).
+
+### 10.1 What changed in `page.tsx`
+
+- **Branding label** — the sidebar header text changed from `Vulnerability Remediation` to `Vulnerability Command & Control`. It still renders through the existing uppercase + letter-spacing style, so it displays as `VULNERABILITY COMMAND & CONTROL`.
+- **Section label** — the nav section heading changed from `Menu` to `Main Pages` (the existing style uppercases it → `MAIN PAGES`).
+- **`NAV_ITEMS` rebuilt** — the module-scope array now holds six entries, each with `id`, `label`, `subtitle`, and `Icon`:
+
+  | `id` | label | subtitle | navigable |
+  |---|---|---|---|
+  | `dashboard` | Executive Dashboard | Overview of remediation | yes → Executive Dashboard page |
+  | `_cio` | CIO Cockpit | CIO remediation summary | no (placeholder) |
+  | `vulnerabilities` | Work Queue | Backlog to remediate | yes → Work Queue / findings grid |
+  | `_validation` | Validation Pending | Remediation pending validation | no (placeholder) |
+  | `_insights` | Insight Dashboards | Placeholder for Tableau | no (placeholder) |
+  | `_weekend` | Weekend C2 | Weekend activity dashboard | no (placeholder) |
+
+  Only `dashboard` and `vulnerabilities` are real pages — the `Page` union is unchanged (`"dashboard" | "vulnerabilities"`). The four `_`-prefixed ids are non-navigable placeholders, exactly the pattern the old `_remediation` / `_reports` / `_settings` entries used. No new routing, no new page components.
+- **`SidebarNavItem` two-line rendering** — the component gained a `subtitle` prop and now renders the label in semibold (600) above a smaller (12px) muted subtitle. The active item now has a **filled solid blue background** (`#2563EB`) with white label and translucent-white subtitle, replacing the old pale `#EFF6FF` tint. Item `minHeight` grew from 44px to 54px to fit two lines; collapsed mode is unchanged (icon-only, 44px, with `label — subtitle` moved to `title` / `aria-label`).
+- **Default landing page** — the `useState<Page>` initial value changed from `"dashboard"` to `"vulnerabilities"`, so **Work Queue is the active/selected page on load** (matches the nav spec's "Active/selected by default" note).
+- **Icon imports** — in the `lucide-react` import block: removed now-unused `ShieldAlert`, `Wrench`, `Settings`; added `Gauge`, `ListChecks`, `ClipboardCheck`, `CalendarClock`. `LayoutDashboard` and `BarChart3` are retained.
+
+### 10.2 Migration notes
+
+- This is a **literal change inside one file** — it comes across on the Phase 2.7 paste of `page.tsx` with no special handling. No alias rewrites are involved; the changed lines touch no `@/` imports.
+- The default-page change means the **AG Grid findings table mounts on first load** instead of the dashboard. The §9.2 selection-API cleanup is now a hard prerequisite: verify it landed before relying on this, or the grid will throw the `getColDef` null error on initial render. (Previously the grid only mounted after a navigation; it is now the entry point.)
+- The shadcn `sidebar` primitive remains unused — Phase 6 gotcha #11 still holds, the host does not need to ship it.
+
+### 10.3 Phase 2 paste-order addendum
+
+| Existing subsection | Addendum |
+|---|---|
+| **2.7 `pages/`** | `app/page.tsx` carries the rebuilt `NAV_ITEMS`, the two-line `SidebarNavItem`, the new branding/section labels, and the `"vulnerabilities"` default-page state — all verbatim on paste. |
+
+### 10.4 Verification checklist for the host (delta from Phase 5)
+
+- [ ] Sidebar header reads `VULNERABILITY COMMAND & CONTROL`; the section label reads `MAIN PAGES`.
+- [ ] Six nav items appear in order: Executive Dashboard, CIO Cockpit, Work Queue, Validation Pending, Insight Dashboards, Weekend C2 — each a bold label over a muted subtitle.
+- [ ] On load, **Work Queue** is the active item (filled solid-blue background) and the findings grid is the visible page.
+- [ ] Clicking Executive Dashboard switches pages; the four `_`-prefixed items are non-interactive (dimmed, no navigation).
+- [ ] Collapsing the sidebar shows icon-only items; hovering a collapsed item surfaces `label — subtitle` as a tooltip.
+
+---
+
 ## Rough effort budget
 
 | Phase | Time |
@@ -629,6 +677,7 @@ After Phase 5's standard lint/test/build sweep, additionally confirm:
 | 7 (user guide sheet wiring) | 10 min — one new file + four `page.tsx` insertions |
 | 8 (lever dropdown — UI only) | 10 min — one constants file + five `page.tsx` insertions; data wiring is a separate follow-up |
 | 9 (post-discovery feature work) | 30–45 min — most of it rides on the Phase 2 file paste; the AG Grid v32 selection-API cleanup in §9.2 needs explicit verification |
+| 10 (left nav restructure) | 5 min — rides on the Phase 2.7 page paste; verify only |
 | **Total** | ~4–5 hours assuming the host already has the shadcn set listed in Phase 4 |
 
 Biggest time sink: alias rewrites. After the folder skeleton is in place, a single find-and-replace pass per alias covers most of the 358 occurrences:
