@@ -4,10 +4,11 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   ShieldCheck,
   LayoutDashboard,
-  ShieldAlert,
-  Wrench,
+  Gauge,
+  ListChecks,
+  ClipboardCheck,
   BarChart3,
-  Settings,
+  CalendarClock,
   ChevronDown,
   Search,
   Bell,
@@ -193,11 +194,42 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { id: "dashboard" as const, label: "Dashboard", Icon: LayoutDashboard },
-  { id: "vulnerabilities" as const, label: "Findings", Icon: ShieldAlert },
-  { id: "_remediation", label: "Remediation", Icon: Wrench },
-  { id: "_reports", label: "Reports", Icon: BarChart3 },
-  { id: "_settings", label: "Settings", Icon: Settings },
+  {
+    id: "dashboard" as const,
+    label: "Executive Dashboard",
+    subtitle: "Overview of remediation",
+    Icon: LayoutDashboard,
+  },
+  {
+    id: "_cio",
+    label: "CIO Cockpit",
+    subtitle: "CIO remediation summary",
+    Icon: Gauge,
+  },
+  {
+    id: "vulnerabilities" as const,
+    label: "Work Queue",
+    subtitle: "Backlog to remediate",
+    Icon: ListChecks,
+  },
+  {
+    id: "_validation",
+    label: "Validation Pending",
+    subtitle: "Remediation pending validation",
+    Icon: ClipboardCheck,
+  },
+  {
+    id: "_insights",
+    label: "Insight Dashboards",
+    subtitle: "Placeholder for Tableau",
+    Icon: BarChart3,
+  },
+  {
+    id: "_weekend",
+    label: "Weekend C2",
+    subtitle: "Weekend activity dashboard",
+    Icon: CalendarClock,
+  },
 ];
 
 function Sidebar({
@@ -310,7 +342,7 @@ function Sidebar({
                 lineHeight: 1,
               }}
             >
-              Vulnerability Remediation
+              Vulnerability Command &amp; Control
             </span>
           )}
         </div>
@@ -350,13 +382,13 @@ function Sidebar({
             whiteSpace: "nowrap",
           }}
         >
-          Menu
+          Main Pages
         </div>
       )}
 
       {/* Nav items */}
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: visualCollapsed ? "0 4px" : "0" }}>
-        {NAV_ITEMS.map(({ id, label, Icon }) => {
+        {NAV_ITEMS.map(({ id, label, subtitle, Icon }) => {
           const isNavigable = id === "dashboard" || id === "vulnerabilities";
           const isActive = isNavigable && id === activePage;
           return (
@@ -364,6 +396,7 @@ function Sidebar({
               key={id}
               id={id}
               label={label}
+              subtitle={subtitle}
               Icon={Icon}
               isActive={isActive}
               collapsed={visualCollapsed}
@@ -435,6 +468,7 @@ function Sidebar({
 function SidebarNavItem({
   id,
   label,
+  subtitle,
   Icon,
   isActive,
   collapsed,
@@ -443,6 +477,7 @@ function SidebarNavItem({
 }: {
   id: string;
   label: string;
+  subtitle: string;
   Icon: React.ComponentType<{ style?: React.CSSProperties }>;
   isActive: boolean;
   collapsed: boolean;
@@ -450,6 +485,15 @@ function SidebarNavItem({
   onClick: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+
+  // Active item: filled blue highlight background with white text.
+  const labelColor = isActive ? "#FFFFFF" : hovered ? "#374151" : "#374151";
+  const subtitleColor = isActive
+    ? "rgba(255,255,255,0.78)"
+    : hovered
+    ? "#6B7280"
+    : "#9CA3AF";
+  const iconColor = isActive ? "#FFFFFF" : hovered ? "#6B7280" : "#9CA3AF";
 
   return (
     <div
@@ -460,27 +504,24 @@ function SidebarNavItem({
       onMouseEnter={() => !isActive && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       aria-current={isActive ? "page" : undefined}
-      aria-label={label}
+      aria-label={collapsed ? `${label} — ${subtitle}` : label}
+      title={collapsed ? `${label} — ${subtitle}` : undefined}
       style={{
-        height: 44,
-        padding: collapsed ? "0" : "0 16px",
+        minHeight: collapsed ? 44 : 54,
+        padding: collapsed ? "0" : "8px 14px",
         borderRadius: 10,
         margin: collapsed ? "3px 4px" : "3px 12px",
         display: "flex",
         alignItems: "center",
         justifyContent: collapsed ? "center" : "flex-start",
-        gap: 10,
+        gap: 12,
         cursor: disabled ? "default" : "pointer",
         background: isActive
-          ? "#EFF6FF"
+          ? "#2563EB"
           : hovered
           ? "#F9FAFB"
           : "transparent",
-        color: isActive ? "#2563EB" : hovered ? "#374151" : "#6B7280",
-        fontWeight: isActive ? 600 : 500,
-        fontSize: 14,
         transition: "background 100ms, color 100ms",
-        whiteSpace: "nowrap",
         opacity: disabled ? 0.45 : 1,
       }}
     >
@@ -489,10 +530,35 @@ function SidebarNavItem({
           width: 18,
           height: 18,
           flexShrink: 0,
-          color: isActive ? "#2563EB" : hovered ? "#6B7280" : "#9CA3AF",
+          color: iconColor,
         }}
       />
-      {!collapsed && <span>{label}</span>}
+      {!collapsed && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+          <span
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: labelColor,
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label}
+          </span>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 400,
+              color: subtitleColor,
+              lineHeight: 1.3,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {subtitle}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1874,7 +1940,8 @@ function VulnerabilitiesPage({
 // ── App Shell ──────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("dashboard");
+  // Work Queue (the findings/vulnerabilities page) is the default landing page.
+  const [currentPage, setCurrentPage] = useState<Page>("vulnerabilities");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCio, setSelectedCio] = useState<(typeof CIO_TEAMS)[0] | null>(null);
