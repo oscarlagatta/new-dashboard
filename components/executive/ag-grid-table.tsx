@@ -516,6 +516,7 @@ export function AgGridTriageTable({
   // CIO-1 Down has no state — its hierarchy data is not yet available
   // (pending an AIT-based lookup), so it renders as a disabled placeholder.
   const [cioFilter, setCioFilter] = useState("");
+  const [leverFilter, setLeverFilter] = useState(""); // "" = All Levers; else a Lever value
   const [connectivityFilter, setConnectivityFilter] = useState(""); // "" | "Internal" | "External"
   const viewport = useViewport();
   const isMobile = viewport === "mobile";
@@ -566,6 +567,7 @@ export function AgGridTriageTable({
       if (leverScope && v.lever !== leverScope) return false;
       // Work Queue top-bar pill filters — also ANDed with everything above.
       if (cioFilter && v.cioDisplayName !== cioFilter) return false;
+      if (leverFilter && v.lever !== leverFilter) return false;
       if (connectivityFilter) {
         const isExternal = v.gisExternalFlag === "Y";
         if (connectivityFilter === "External" && !isExternal) return false;
@@ -573,7 +575,7 @@ export function AgGridTriageTable({
       }
       return true;
     },
-    [filters, filterPreset, settings, cioScope, leverScope, cioFilter, connectivityFilter]
+    [filters, filterPreset, settings, cioScope, leverScope, cioFilter, leverFilter, connectivityFilter]
   );
 
   // Apply external filters via grid's external filter mechanism
@@ -584,8 +586,9 @@ export function AgGridTriageTable({
       !!cioScope ||
       !!leverScope ||
       !!cioFilter ||
+      !!leverFilter ||
       !!connectivityFilter,
-    [activeFilters, filterPreset, cioScope, leverScope, cioFilter, connectivityFilter]
+    [activeFilters, filterPreset, cioScope, leverScope, cioFilter, leverFilter, connectivityFilter]
   );
 
   const doesExternalFilterPass = useCallback(
@@ -1133,7 +1136,7 @@ export function AgGridTriageTable({
     if (gridRef.current?.api) {
       gridRef.current.api.onFilterChanged();
     }
-  }, [filters, filterPreset, cioScope, leverScope, cioFilter, connectivityFilter]);
+  }, [filters, filterPreset, cioScope, leverScope, cioFilter, leverFilter, connectivityFilter]);
 
   const clearAllFilters = useCallback(() => {
     setFilters(
@@ -1143,6 +1146,7 @@ export function AgGridTriageTable({
     );
     setQuickFilter("");
     setCioFilter("");
+    setLeverFilter("");
     setConnectivityFilter("");
     onClearFilterPreset?.();
     onClearCioScope?.();
@@ -1314,22 +1318,22 @@ export function AgGridTriageTable({
           viewport. AG Grid's pagination bar lives inside the grid, so it
           naturally pins to the bottom of the grid area. */}
       <div className="flex flex-col gap-2 flex-1 min-h-0">
-        {/* Work Queue filter bar — CIO / CIO-1 Down / Internal vs. External.
-            Sits as the top row above the grid toolbar, per screenshot.webp. */}
+        {/* Work Queue filter bar — CIO / CIO-1 Down / Lever / Internal vs. External.
+            Sits as the top row above the grid toolbar. */}
         <div
           className="flex flex-wrap items-center gap-3 flex-shrink-0"
           role="group"
           aria-label="Work Queue filters"
         >
           <FilterPill
-            label="CIO Filter"
+            label="CIO"
             options={cioOptions}
             value={cioFilter}
             onChange={setCioFilter}
             allLabel="All CIOs"
           />
           <FilterPill
-            label="CIO-1 Down Filter"
+            label="CIO-1 Down"
             options={[]}
             value=""
             onChange={() => {}}
@@ -1337,7 +1341,14 @@ export function AgGridTriageTable({
             disabledHint="CIO-1 downward hierarchy is not yet available — pending an AIT-based lookup (AIT Manager, 2-Deep / 3-Deep). Filtering will be wired once that data exists."
           />
           <FilterPill
-            label="Internal vs. External Filter"
+            label="Lever"
+            options={LEVERS}
+            value={leverFilter}
+            onChange={setLeverFilter}
+            allLabel="All Levers"
+          />
+          <FilterPill
+            label="Internal vs. External"
             options={["Internal", "External"]}
             value={connectivityFilter}
             onChange={setConnectivityFilter}
@@ -1450,6 +1461,7 @@ export function AgGridTriageTable({
           cioScope ||
           leverScope ||
           cioFilter ||
+          leverFilter ||
           connectivityFilter) && (
           <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
             {filterPreset && (
@@ -1507,6 +1519,21 @@ export function AgGridTriageTable({
                   className="hover:text-destructive transition-colors"
                   onClick={() => setCioFilter("")}
                   aria-label={`Remove CIO filter ${cioFilter}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {leverFilter && (
+              <span
+                key={`lever-filter-${leverFilter}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
+              >
+                Lever: {leverFilter}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => setLeverFilter("")}
+                  aria-label={`Remove Lever filter ${leverFilter}`}
                 >
                   <X className="h-3 w-3" />
                 </button>
