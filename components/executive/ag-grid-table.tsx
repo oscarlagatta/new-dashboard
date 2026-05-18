@@ -38,6 +38,7 @@ import {
   X,
   ChevronDown,
   LayoutGrid,
+  Check,
 } from "lucide-react";
 import { DetailSheet } from "@/components/vulnerability/detail-sheet";
 import { VulnerabilityCard } from "@/components/executive/vulnerability-card";
@@ -185,6 +186,114 @@ function MultiSelectPopover({ label, options, selected, onChange }: MultiSelectP
             Clear
           </Button>
         )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ── Work Queue filter pills ─────────────────────────────────────────────────────
+
+// Wide grey single-select dropdown buttons shown in a horizontal row above the
+// grid (see screenshot.webp). An empty `value` ("") means no filter is applied
+// — the implicit "All" option. The button label stays fixed; a selected value
+// is appended after the label so the row reads as a stable, named control set.
+
+interface FilterPillProps {
+  label: string;
+  options: string[];
+  value: string; // "" = All
+  onChange: (value: string) => void;
+  /** Label for the implicit reset option. */
+  allLabel?: string;
+  /** Render the pill but make it non-interactive (data wiring not yet available). */
+  disabled?: boolean;
+  /** Tooltip explaining why the pill is disabled. */
+  disabledHint?: string;
+}
+
+function FilterPillOption({
+  label,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors flex items-center gap-2"
+      onClick={onSelect}
+      aria-pressed={selected}
+    >
+      <Check
+        className={`h-3.5 w-3.5 flex-shrink-0 text-primary ${selected ? "opacity-100" : "opacity-0"}`}
+      />
+      <span className="flex-1 truncate">{label}</span>
+    </button>
+  );
+}
+
+function FilterPill({
+  label,
+  options,
+  value,
+  onChange,
+  allLabel = "All",
+  disabled = false,
+  disabledHint,
+}: FilterPillProps) {
+  const [open, setOpen] = useState(false);
+  const active = value !== "";
+
+  const trigger = (
+    <Button
+      variant="secondary"
+      disabled={disabled}
+      className="h-9 min-w-[150px] sm:min-w-[190px] justify-between gap-2 rounded-lg px-3.5 text-xs font-medium disabled:opacity-50"
+      aria-label={
+        disabled
+          ? `${label} — unavailable`
+          : `${label}${active ? `: ${value}` : ""}`
+      }
+      title={disabled ? disabledHint : undefined}
+    >
+      <span className="truncate">
+        {label}
+        {active && <span className="text-primary">: {value}</span>}
+      </span>
+      <ChevronDown className="h-3.5 w-3.5 opacity-50 flex-shrink-0" />
+    </Button>
+  );
+
+  // Disabled pills (e.g. CIO-1 Down before its hierarchy data exists) still
+  // render in the bar so the control set is complete, but open no popover.
+  if (disabled) return trigger;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className="w-56 p-1 max-h-[50vh] overflow-y-auto" align="start">
+        <FilterPillOption
+          label={allLabel}
+          selected={value === ""}
+          onSelect={() => {
+            onChange("");
+            setOpen(false);
+          }}
+        />
+        {options.length > 0 && <div aria-hidden className="my-1 h-px bg-border" />}
+        {options.map((opt) => (
+          <FilterPillOption
+            key={opt}
+            label={opt}
+            selected={value === opt}
+            onSelect={() => {
+              onChange(opt);
+              setOpen(false);
+            }}
+          />
+        ))}
       </PopoverContent>
     </Popover>
   );
@@ -403,6 +512,11 @@ export function AgGridTriageTable({
   );
   const [selectedCount, setSelectedCount] = useState(0);
   const [density, setDensity] = useState<DensityMode>("comfortable");
+  // Work Queue top-bar pill filters. "" = no filter (the implicit "All").
+  // CIO-1 Down has no state — its hierarchy data is not yet available
+  // (pending an AIT-based lookup), so it renders as a disabled placeholder.
+  const [cioFilter, setCioFilter] = useState("");
+  const [connectivityFilter, setConnectivityFilter] = useState(""); // "" | "Internal" | "External"
   const viewport = useViewport();
   const isMobile = viewport === "mobile";
   const isTablet = viewport === "tablet";
@@ -417,6 +531,15 @@ export function AgGridTriageTable({
     }
     return chips;
   }, [filters]);
+
+  // Distinct CIO groups present in the data — feeds the CIO pill dropdown.
+  const cioOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(vulnerabilities.map((v) => v.cioDisplayName).filter(Boolean))
+      ).sort(),
+    [vulnerabilities]
+  );
 
   // Shared predicate so the grid (desktop/tablet) and card list (mobile)
   // apply the same filter logic. Includes the toolbar multi-selects AND any
@@ -441,16 +564,28 @@ export function AgGridTriageTable({
       // Header CIO and Lever scopes AND with the toolbar filters and preset.
       if (cioScope && v.cioDisplayName !== cioScope) return false;
       if (leverScope && v.lever !== leverScope) return false;
+      // Work Queue top-bar pill filters — also ANDed with everything above.
+      if (cioFilter && v.cioDisplayName !== cioFilter) return false;
+      if (connectivityFilter) {
+        const isExternal = v.gisExternalFlag === "Y";
+        if (connectivityFilter === "External" && !isExternal) return false;
+        if (connectivityFilter === "Internal" && isExternal) return false;
+      }
       return true;
     },
-    [filters, filterPreset, settings, cioScope, leverScope]
+    [filters, filterPreset, settings, cioScope, leverScope, cioFilter, connectivityFilter]
   );
 
   // Apply external filters via grid's external filter mechanism
   const isExternalFilterPresent = useCallback(
     () =>
-      activeFilters.length > 0 || !!filterPreset || !!cioScope || !!leverScope,
-    [activeFilters, filterPreset, cioScope, leverScope]
+      activeFilters.length > 0 ||
+      !!filterPreset ||
+      !!cioScope ||
+      !!leverScope ||
+      !!cioFilter ||
+      !!connectivityFilter,
+    [activeFilters, filterPreset, cioScope, leverScope, cioFilter, connectivityFilter]
   );
 
   const doesExternalFilterPass = useCallback(
@@ -998,7 +1133,7 @@ export function AgGridTriageTable({
     if (gridRef.current?.api) {
       gridRef.current.api.onFilterChanged();
     }
-  }, [filters, filterPreset, cioScope, leverScope]);
+  }, [filters, filterPreset, cioScope, leverScope, cioFilter, connectivityFilter]);
 
   const clearAllFilters = useCallback(() => {
     setFilters(
@@ -1007,6 +1142,8 @@ export function AgGridTriageTable({
       ) as Record<FilterKey, Set<string>>
     );
     setQuickFilter("");
+    setCioFilter("");
+    setConnectivityFilter("");
     onClearFilterPreset?.();
     onClearCioScope?.();
     onClearLeverScope?.();
@@ -1177,6 +1314,37 @@ export function AgGridTriageTable({
           viewport. AG Grid's pagination bar lives inside the grid, so it
           naturally pins to the bottom of the grid area. */}
       <div className="flex flex-col gap-2 flex-1 min-h-0">
+        {/* Work Queue filter bar — CIO / CIO-1 Down / Internal vs. External.
+            Sits as the top row above the grid toolbar, per screenshot.webp. */}
+        <div
+          className="flex flex-wrap items-center gap-3 flex-shrink-0"
+          role="group"
+          aria-label="Work Queue filters"
+        >
+          <FilterPill
+            label="CIO Filter"
+            options={cioOptions}
+            value={cioFilter}
+            onChange={setCioFilter}
+            allLabel="All CIOs"
+          />
+          <FilterPill
+            label="CIO-1 Down Filter"
+            options={[]}
+            value=""
+            onChange={() => {}}
+            disabled
+            disabledHint="CIO-1 downward hierarchy is not yet available — pending an AIT-based lookup (AIT Manager, 2-Deep / 3-Deep). Filtering will be wired once that data exists."
+          />
+          <FilterPill
+            label="Internal vs. External Filter"
+            options={["Internal", "External"]}
+            value={connectivityFilter}
+            onChange={setConnectivityFilter}
+            allLabel="All"
+          />
+        </div>
+
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
           {/* Saved Views selector — left of search; grid-only feature */}
@@ -1280,7 +1448,9 @@ export function AgGridTriageTable({
           quickFilter ||
           filterPreset ||
           cioScope ||
-          leverScope) && (
+          leverScope ||
+          cioFilter ||
+          connectivityFilter) && (
           <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
             {filterPreset && (
               <span
@@ -1322,6 +1492,36 @@ export function AgGridTriageTable({
                   className="hover:text-destructive transition-colors"
                   onClick={() => onClearLeverScope?.()}
                   aria-label={`Remove Lever scope ${leverScope}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {cioFilter && (
+              <span
+                key={`cio-filter-${cioFilter}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
+              >
+                CIO: {cioFilter}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => setCioFilter("")}
+                  aria-label={`Remove CIO filter ${cioFilter}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {connectivityFilter && (
+              <span
+                key={`connectivity-filter-${connectivityFilter}`}
+                className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
+              >
+                {connectivityFilter}
+                <button
+                  className="hover:text-destructive transition-colors"
+                  onClick={() => setConnectivityFilter("")}
+                  aria-label={`Remove ${connectivityFilter} filter`}
                 >
                   <X className="h-3 w-3" />
                 </button>
