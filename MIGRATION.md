@@ -665,6 +665,74 @@ The hand-rolled page-level sidebar (Phase 6 gotcha #11 — the one *not* built o
 
 ---
 
+## Phase 11 — Work Queue rework: filter bar, columns, bulk update (added 2026-05-18)
+
+> **Status:** committed to `feature/migration-for-demo`, commits `a66c7fa` … `7ea3014` (base `955bcbe`) — **plus one new file, `lib/disposition-fields.ts`, that is not yet committed.** Most of this rides on the Phase 2 file paste; the items below need explicit attention. The sidebar nav restructure within this commit range is already covered by **Phase 10** — this phase covers everything else.
+>
+> **Source commits:** `6b5d291` (filter pills), `e16f011` (Lever filter), `7ea3014` (columns + bulk update + disposition logic + dropdown removal). Use `git show <hash>` for exact lines.
+
+Reworks the Work Queue / All Findings page: a top filter bar, a fixed 13-column layout, a Closed-row default filter, a staged bulk-update toolbar, shared per-disposition required-field logic, and removal of the now-redundant global header dropdowns.
+
+### 11.1 New `lib/` files
+
+| Source | → | Destination | Notes |
+|---|---|---|---|
+| `lib/patch-windows.ts` | → | `src/lib/utils/patch-windows.ts` | Pure function, zero imports — pre-existing but missing from the Phase 2.3 list; add it there. |
+| `lib/disposition-fields.ts` | → | `src/lib/constants/disposition-fields.ts` | **New file — not in any commit; create it.** Static `Record<Disposition, …>` rules map; belongs with `levers.ts` / `filter-presets.ts`. |
+
+`disposition-fields.ts` exports `dispositionFields` (per-disposition conditional-field rules) and the `DispositionFieldRules` type — the single source of truth consumed by the bulk-update toolbar. `detail-sheet.tsx` keeps its own identical local copy for now (dedupe later; the keys must match the `Disposition` union exactly).
+
+### 11.2 `lib/types.ts` changes
+
+- `Disposition` union — adds catch-all member `"Other (please provide detail)"` (before `""`).
+- `DISPOSITIONS` array — the 5 legacy entries (`Fix`, `Defer`, `Mitigate`, `Accept Risk`, `False Positive`) are removed from the **list**; `"Other (please provide detail)"` is appended as the final entry. The legacy values **stay in the `Disposition` type** so historical/mock records remain valid — only the dropdown list changed.
+- `Vulnerability` interface — adds optional `dispositionDetail?: string`.
+
+### 11.3 `components/vulnerability/detail-sheet.tsx`
+
+The per-row triage form gains "Other" disposition handling (~5 small spots in `TriageForm`):
+- local `dispositionFields` map += `"Other (please provide detail)": {}`.
+- form state += `dispositionDetail`; `errors` requires it when disposition is "Other"; `diffSpecs` audit-logs it.
+- the disposition `<Select>` drops the spec/legacy split (now a plain `DISPOSITIONS.map`); a conditional **"Please provide detail"** `<Textarea>` renders when "Other" is selected.
+
+Verbatim move otherwise. Use `?? ""` / `?.trim()` on `dispositionDetail` (optional field).
+
+### 11.4 `components/executive/ag-grid-table.tsx`
+
+The bulk of the work (~960 lines). Port feature-by-feature:
+
+- **Imports** — add `Check` (lucide); `Tooltip` / `TooltipContent` / `TooltipTrigger` (`@/components/ui/tooltip` → host shadcn — **`tooltip` is a new shadcn primitive; add it to the Phase 4 list**); `getPatchWindows` (`@/lib/patch-windows`); `BLOCKERS` + `Blocker` (`@/lib/types`); `dispositionFields` (`@/lib/disposition-fields`).
+- **Filter bar** — new `FilterPill` / `FilterPillOption` components; a 4-pill row (CIO · CIO-1 Down [disabled placeholder] · Lever · Internal vs. External) as the first child of the grid; `cioFilter` / `leverFilter` / `connectivityFilter` state; wired into `matchesFilters`, `isExternalFilterPresent`, the `onFilterChanged` effect, `clearAllFilters`, and the chip strip; `cioOptions` memo.
+- **Columns** — `columnDefs` rebuilt to 13 visible columns in fixed order (Stage Status · Age (days) · Lever · Source · CVE · Title · External / Internal · Workstream · Technology · AIT Number · AIT Name · Owner · CIO); everything else `hide: true`. Severity Risk and Triage Status columns removed. New: External / Internal (valueGetter on `gisExternalFlag`), AIT Number (`applicationId`). `TABLET_VISIBLE_FIELDS` narrowed. AIT Number/Name, Owner, CIO map to existing fields (`applicationId` / `applicationFullName` / `vulnOwner` / `cioDisplayName`) — no schema change.
+- **Closed-row filter** — `openVulnerabilities` memo (`status !== "Closed"`) feeds `rowData`, `cardVulns`, and `<DetailSheet allVulnerabilities>`.
+- **Bulk-update toolbar** — new `BulkUpdateToolbar` / `BulkStageSelect` / `BulkDispositionPopover` components, `bulkUpdateApi` (stub shared handler), `applyBulkPatch`, plus `DispositionDraft` / `missingDispositionFields` / `dispositionDraftToPatch` helpers. Appears above the grid on row selection; staged selections committed by one Apply button. The Disposition control mirrors `dispositionFields` (conditional required fields) and handles "Other". The old bottom `BulkActionBar` is no longer rendered — **delete the `BulkActionBar` component + `BulkActionBarProps`** (dead code left in the demo file).
+- **Tooltips** — black/white shadcn tooltips on the bulk pills showing the staged values.
+
+> Keep the defensive `?? ""` / `?.trim()` reads on `detail` / `dispositionDetail` — they guard against partially-shaped draft objects.
+
+### 11.5 `app/page.tsx`
+
+Two features in this commit range — the **sidebar nav restructure** (already documented — see **Phase 10**) and the **removal of the global CIO + Lever header dropdowns** (`7ea3014`):
+- Both header `<Popover>`s removed from `HeaderCard`, with all wiring — `selectedCio` / `selectedLever` state, `cioScope` / `leverScope`, `onClearCioScope` / `onClearLeverScope`, and the props threaded through `HeaderCard` / `VulnerabilitiesPage`.
+- `CIO_DEPARTMENTS` constant removed; `MetaRow` loses its `department` prop; the "All Findings" sub-header drops the `"{CIO} · {dept} · "` prefix.
+- Now-unused imports removed (`CIO_TEAMS`, `Lever`, `@/lib/constants/levers`, `Check`, `Popover*`).
+- `ag-grid-table.tsx` is untouched by this — its `cioScope` / `leverScope` props are optional and are simply no longer passed.
+
+### 11.6 Apply order & verification
+
+Apply in dependency order: **`types.ts` → `disposition-fields.ts` → `detail-sheet.tsx` → `ag-grid-table.tsx` → `page.tsx`**.
+
+After the standard Phase 5 sweep, additionally confirm:
+
+- [ ] Work Queue shows the 4-pill filter bar; CIO / Lever / Internal-External filter the grid; CIO-1 Down is disabled.
+- [ ] The grid shows the 13 columns in order; no Severity / Triage Status columns; Closed rows absent by default.
+- [ ] Selecting rows reveals the Bulk Update toolbar; staging + Apply works; a disposition needing dependent fields blocks Apply until filled; "Other" requires its detail text.
+- [ ] Both disposition dropdowns show no legacy values and a final "Other (please provide detail)" that reveals a detail input.
+- [ ] The page header has no CIO / Lever dropdowns.
+- [ ] No AG Grid console warnings; no `undefined.trim()` runtime error.
+
+---
+
 ## Rough effort budget
 
 | Phase | Time |
@@ -678,7 +746,8 @@ The hand-rolled page-level sidebar (Phase 6 gotcha #11 — the one *not* built o
 | 8 (lever dropdown — UI only) | 10 min — one constants file + five `page.tsx` insertions; data wiring is a separate follow-up |
 | 9 (post-discovery feature work) | 30–45 min — most of it rides on the Phase 2 file paste; the AG Grid v32 selection-API cleanup in §9.2 needs explicit verification |
 | 10 (left nav restructure) | 5 min — rides on the Phase 2.7 page paste; verify only |
-| **Total** | ~4–5 hours assuming the host already has the shadcn set listed in Phase 4 |
+| 11 (Work Queue rework) | 60–90 min — one large file (`ag-grid-table.tsx`, ~960 lines) plus a new constants file; mostly verbatim once the standard alias rewrites are done |
+| **Total** | ~5–6 hours assuming the host already has the shadcn set listed in Phase 4 |
 
 Biggest time sink: alias rewrites. After the folder skeleton is in place, a single find-and-replace pass per alias covers most of the 358 occurrences:
 
