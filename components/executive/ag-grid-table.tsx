@@ -32,6 +32,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Search,
   Download,
   Filter,
@@ -59,9 +64,11 @@ import {
   DispositionCellRenderer,
   TechnologyCellRenderer,
 } from "@/components/ag-grid/cell-renderers";
-import type { Vulnerability, Disposition, Lever } from "@/lib/types";
-import { LEVERS, DISPOSITIONS } from "@/lib/types";
+import type { Vulnerability, Disposition, Lever, Blocker } from "@/lib/types";
+import { LEVERS, DISPOSITIONS, BLOCKERS } from "@/lib/types";
 import { USERS } from "@/lib/mock-data";
+import { getPatchWindows } from "@/lib/patch-windows";
+import { dispositionFields } from "@/lib/disposition-fields";
 import "@/lib/ag-grid-setup";
 import { useSavedViews } from "@/hooks/use-saved-views";
 import { useSavedViewsToolbarUi } from "@/components/vulnerability/saved-views-toolbar";
@@ -92,13 +99,11 @@ type DensityMode = "compact" | "comfortable";
 // horizontal scroll. Hidden columns remain available via the side-panel
 // Columns tool when the user pulls it up.
 const TABLET_VISIBLE_FIELDS = new Set<string>([
-  "triageStatus",
-  "severityRisk",
   "status",
+  "daysOpen",
+  "lever",
   "cve",
   "title",
-  "hostName",
-  "dueDate",
   "vulnOwner",
 ]);
 
@@ -459,6 +464,476 @@ function BulkActionBar({
   );
 }
 
+// ── Bulk Update Toolbar ────────────────────────────────────────────────────────
+
+/**
+ * Shared bulk-update handler — STUB. Wire this to the real bulk-update API
+ * endpoint once it exists. For now it just logs the intended change.
+ */
+function bulkUpdateApi(patch: Partial<Vulnerability>, rows: Vulnerability[]): void {
+  console.info(
+    `[bulk-update stub] applying`,
+    patch,
+    `to ${rows.length} finding(s):`,
+    rows.map((r) => r.id)
+  );
+}
+
+// Shared styling for the native <select>/<textarea> in the disposition popover.
+const BULK_FIELD_CLASS =
+  "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+// Staged disposition + its conditional dependent fields, edited in the popover.
+interface DispositionDraft {
+  disposition: Disposition;
+  detail: string;
+  remediationDate: string;
+  crq: string;
+  blockers: Blocker[];
+  justification: string;
+  fpReason: string;
+}
+
+const EMPTY_DISPOSITION_DRAFT: DispositionDraft = {
+  disposition: "",
+  detail: "",
+  remediationDate: "",
+  crq: "",
+  blockers: [],
+  justification: "",
+  fpReason: "",
+};
+
+// Required dependent fields still empty for the chosen disposition — mirrors
+// the per-row triage form's validation. Empty when no disposition is chosen.
+function missingDispositionFields(
+  d: DispositionDraft,
+  patchWindowStaged: boolean
+): string[] {
+  if (!d.disposition) return [];
+  const rules = dispositionFields[d.disposition] ?? {};
+  const missing: string[] = [];
+  if (d.disposition === "Other (please provide detail)" && !d.detail?.trim()) {
+    missing.push("Detail");
+  }
+  // Patch Window is the toolbar's standalone control — checked here, not
+  // collected in the popover, so the user only ever sets it once.
+  if (rules.patchWindow && !patchWindowStaged) missing.push("Patch Window");
+  if (rules.remediationDate && !d.remediationDate) missing.push("Remediation Date");
+  if (rules.crq && !d.crq.trim()) missing.push("CRQ");
+  if (rules.blockers && d.blockers.length === 0) missing.push("Blockers");
+  if (rules.justification && !d.justification.trim()) missing.push("Justification");
+  return missing;
+}
+
+// The Vulnerability patch a disposition draft contributes (only its rule-gated
+// fields). Returns {} when no disposition is chosen.
+function dispositionDraftToPatch(d: DispositionDraft): Partial<Vulnerability> {
+  if (!d.disposition) return {};
+  const rules = dispositionFields[d.disposition] ?? {};
+  // requestedPatchWindow is contributed by the toolbar's standalone Patch
+  // Window control, not here — so it is never asked for twice.
+  const patch: Partial<Vulnerability> = { disposition: d.disposition };
+  if (rules.remediationDate) patch.expectedRemediationDate = d.remediationDate;
+  if (rules.crq) patch.crqNumber = d.crq;
+  if (rules.blockers) patch.identifiedBlockers = d.blockers;
+  if (rules.justification) patch.deferralJustification = d.justification;
+  if (rules.falsePositive && d.fpReason.trim()) patch.falsePositiveReason = d.fpReason;
+  if (d.disposition === "Other (please provide detail)") {
+    patch.dispositionDetail = d.detail ?? "";
+  }
+  return patch;
+}
+
+// A single-value staging dropdown. The picked value is held (not applied) and
+// shown on the trigger; the toolbar's Apply button commits it.
+function BulkStageSelect({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              variant={value ? "secondary" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+            >
+              <span className="truncate max-w-[170px]">
+                {value ? `${label}: ${value}` : label}
+              </span>
+              <ChevronDown className="h-3 w-3 opacity-60 flex-shrink-0" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        {value && (
+          <TooltipContent className="bg-zinc-900 text-white">
+            {label}: {value}
+          </TooltipContent>
+        )}
+      </Tooltip>
+      <PopoverContent className="w-64 p-1 max-h-[50vh] overflow-y-auto" align="start">
+        {value && (
+          <button
+            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors text-muted-foreground"
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+          >
+            Clear
+          </button>
+        )}
+        {options.map((opt) => (
+          <button
+            key={opt}
+            className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-muted transition-colors"
+            onClick={() => {
+              onChange(opt);
+              setOpen(false);
+            }}
+          >
+            {opt}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Bulk Disposition control — edits the staged DispositionDraft. Mirrors the
+ * per-row triage form's conditional required-field logic (dispositionFields):
+ * a disposition that needs dependent fields reveals + requires them. The
+ * toolbar's single Apply button (not this popover) commits the change.
+ */
+function BulkDispositionPopover({
+  draft,
+  missing,
+  onChange,
+}: {
+  draft: DispositionDraft;
+  missing: string[];
+  onChange: (draft: DispositionDraft) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rules = dispositionFields[draft.disposition] ?? {};
+  const active = draft.disposition !== "";
+  const incomplete = active && missing.length > 0;
+
+  const set = (patch: Partial<DispositionDraft>) =>
+    onChange({ ...draft, ...patch });
+
+  const toggleBlocker = (b: Blocker) =>
+    set({
+      blockers: draft.blockers.includes(b)
+        ? draft.blockers.filter((x) => x !== b)
+        : [...draft.blockers, b],
+    });
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              variant={active ? "secondary" : "outline"}
+              size="sm"
+              className="h-8 text-xs gap-1.5"
+            >
+              <span className="truncate max-w-[200px]">
+                {active ? `Disposition: ${draft.disposition}` : "Disposition"}
+              </span>
+              {incomplete && (
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0"
+                  aria-label="Required fields missing"
+                />
+              )}
+              <ChevronDown className="h-3 w-3 opacity-60 flex-shrink-0" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        {active && (
+          <TooltipContent className="bg-zinc-900 text-white max-w-xs">
+            <div className="space-y-0.5">
+              <div>Disposition: {draft.disposition}</div>
+              {draft.detail && <div>Detail: {draft.detail}</div>}
+              {draft.remediationDate && (
+                <div>Remediation Date: {draft.remediationDate}</div>
+              )}
+              {draft.crq && <div>CRQ: {draft.crq}</div>}
+              {draft.blockers.length > 0 && (
+                <div>Blockers: {draft.blockers.join(", ")}</div>
+              )}
+              {draft.justification && (
+                <div>Justification: {draft.justification}</div>
+              )}
+              {draft.fpReason && (
+                <div>False-positive reason: {draft.fpReason}</div>
+              )}
+            </div>
+          </TooltipContent>
+        )}
+      </Tooltip>
+      <PopoverContent
+        className="w-96 p-3 max-h-[70vh] overflow-y-auto space-y-3"
+        align="start"
+      >
+        <div>
+          <Label className="text-xs font-medium mb-1 block">Disposition</Label>
+          <select
+            value={draft.disposition}
+            onChange={(e) => set({ disposition: e.target.value as Disposition })}
+            className={BULK_FIELD_CLASS}
+          >
+            <option value="">No change</option>
+            {DISPOSITIONS.map((d) => (
+              <option key={d.value} value={d.value}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {draft.disposition === "Other (please provide detail)" && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              Please provide detail <span className="text-red-500">*</span>
+            </Label>
+            <textarea
+              value={draft.detail ?? ""}
+              onChange={(e) => set({ detail: e.target.value })}
+              rows={3}
+              className={`${BULK_FIELD_CLASS} resize-none`}
+            />
+          </div>
+        )}
+
+        {rules.patchWindow && (
+          <p className="text-[11px] text-muted-foreground">
+            This disposition requires a <strong>Patch Window</strong> — set it
+            with the Patch Window dropdown in the toolbar.
+          </p>
+        )}
+
+        {rules.remediationDate && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              Remediation Date <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              type="date"
+              value={draft.remediationDate}
+              onChange={(e) => set({ remediationDate: e.target.value })}
+              className="h-8 text-xs"
+            />
+          </div>
+        )}
+
+        {rules.crq && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              CRQ <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              value={draft.crq}
+              onChange={(e) => set({ crq: e.target.value })}
+              placeholder="CRQ000000123456"
+              className="h-8 text-xs font-mono"
+            />
+          </div>
+        )}
+
+        {rules.blockers && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              Identified Blockers <span className="text-red-500">*</span>
+            </Label>
+            <div className="space-y-1 max-h-40 overflow-y-auto rounded-md border border-input p-1.5">
+              {BLOCKERS.map((b) => (
+                <label
+                  key={b}
+                  className="flex items-start gap-2 px-1 py-0.5 text-xs cursor-pointer"
+                >
+                  <Checkbox
+                    checked={draft.blockers.includes(b)}
+                    onCheckedChange={() => toggleBlocker(b)}
+                    className="mt-0.5"
+                  />
+                  <span className="leading-tight">{b}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {rules.justification && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              Justification <span className="text-red-500">*</span>
+            </Label>
+            <textarea
+              value={draft.justification}
+              onChange={(e) => set({ justification: e.target.value })}
+              rows={3}
+              className={`${BULK_FIELD_CLASS} resize-none`}
+            />
+          </div>
+        )}
+
+        {rules.falsePositive && (
+          <div>
+            <Label className="text-xs font-medium mb-1 block">
+              False-positive reason
+            </Label>
+            <textarea
+              value={draft.fpReason}
+              onChange={(e) => set({ fpReason: e.target.value })}
+              rows={2}
+              className={`${BULK_FIELD_CLASS} resize-none`}
+            />
+          </div>
+        )}
+
+        {incomplete && (
+          <p className="text-[11px] text-red-500">
+            Required before this can be applied: {missing.join(", ")}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setOpen(false)}
+          >
+            Done
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Shown above the grid whenever rows are selected. Every dropdown stages a
+// value; the single "Apply" button commits all staged changes to every
+// selected row at once.
+function BulkUpdateToolbar({
+  selectedCount,
+  patchWindows,
+  onApplyPatch,
+  onClear,
+}: {
+  selectedCount: number;
+  patchWindows: string[];
+  onApplyPatch: (patch: Partial<Vulnerability>) => void;
+  onClear: () => void;
+}) {
+  const [lever, setLever] = useState("");
+  const [owner, setOwner] = useState("");
+  const [patchWindow, setPatchWindow] = useState("");
+  const [dispDraft, setDispDraft] = useState<DispositionDraft>(
+    EMPTY_DISPOSITION_DRAFT
+  );
+
+  if (selectedCount === 0) return null;
+
+  const dispMissing = missingDispositionFields(dispDraft, patchWindow !== "");
+  const dispIncomplete = dispDraft.disposition !== "" && dispMissing.length > 0;
+
+  const patch: Partial<Vulnerability> = {
+    ...(dispIncomplete ? {} : dispositionDraftToPatch(dispDraft)),
+    ...(lever ? { lever: lever as Lever } : {}),
+    ...(owner ? { vulnOwner: owner } : {}),
+    ...(patchWindow ? { requestedPatchWindow: patchWindow } : {}),
+  };
+  const stagedCount = Object.keys(patch).length;
+  const canApply = stagedCount > 0 && !dispIncomplete;
+
+  const resetStaged = () => {
+    setLever("");
+    setOwner("");
+    setPatchWindow("");
+    setDispDraft(EMPTY_DISPOSITION_DRAFT);
+  };
+
+  const apply = () => {
+    if (!canApply) return;
+    onApplyPatch(patch);
+    resetStaged();
+  };
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 flex-shrink-0 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2"
+      role="region"
+      aria-label="Bulk update"
+    >
+      <span className="text-xs font-semibold">
+        Bulk update — {selectedCount} row{selectedCount !== 1 ? "s" : ""} selected:
+      </span>
+      <BulkStageSelect
+        label="Lever"
+        options={LEVERS}
+        value={lever}
+        onChange={setLever}
+      />
+      <BulkDispositionPopover
+        draft={dispDraft}
+        missing={dispMissing}
+        onChange={setDispDraft}
+      />
+      <BulkStageSelect
+        label="Patch Window"
+        options={patchWindows}
+        value={patchWindow}
+        onChange={setPatchWindow}
+      />
+      <BulkStageSelect
+        label="Owner"
+        options={USERS.map((u) => u.name)}
+        value={owner}
+        onChange={setOwner}
+      />
+      <Button
+        size="sm"
+        className="h-8 text-xs"
+        disabled={!canApply}
+        onClick={apply}
+        title={
+          dispIncomplete
+            ? `Complete the disposition fields: ${dispMissing.join(", ")}`
+            : undefined
+        }
+      >
+        Apply to {selectedCount} row{selectedCount !== 1 ? "s" : ""}
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="ml-auto h-7 text-xs"
+        onClick={() => {
+          resetStaged();
+          onClear();
+        }}
+      >
+        Clear selection
+      </Button>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 interface Props {
@@ -596,6 +1071,13 @@ export function AgGridTriageTable({
     [matchesFilters]
   );
 
+  // Default row scope — Closed findings are excluded ("Stage Status"). The
+  // source data is untouched; only the rows passed to the grid are pre-filtered.
+  const openVulnerabilities = useMemo(
+    () => vulnerabilities.filter((v) => v.status !== "Closed"),
+    [vulnerabilities]
+  );
+
   // Card-list mode (mobile) — apply quick-filter + external filters here since
   // there's no grid to host them. Sort by severity priority so worst-first.
   const cardVulns = useMemo(() => {
@@ -606,10 +1088,10 @@ export function AgGridTriageTable({
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-    return vulnerabilities
+    return openVulnerabilities
       .filter((v) => (!q || haystack(v).includes(q)) && matchesFilters(v))
       .sort((a, b) => severityRiskComparator(a.severityRisk, b.severityRisk));
-  }, [isMobile, vulnerabilities, quickFilter, matchesFilters]);
+  }, [isMobile, openVulnerabilities, quickFilter, matchesFilters]);
 
   const columnDefs: ColDef<Vulnerability>[] = useMemo(
     () => [
@@ -619,38 +1101,43 @@ export function AgGridTriageTable({
       // alongside the new rowSelection object causes AG Grid to produce null
       // entries in its internal column model, which crashes its renderer
       // (TypeError: Cannot read properties of null (reading 'getColDef')).
-      // 1. Triage Status
+      // Visible columns — fixed left-to-right order per the Work Queue spec.
+      // Severity and Triage Status removed per stakeholder direction.
+      // 1. Stage Status
       {
-        headerName: "Triage Status",
-        field: "triageStatus",
-        width: 175,
-        pinned: "left" as const,
-        cellRenderer: TriageStatusBadgeCellRenderer,
-        comparator: statusComparator,
-        filter: "agSetColumnFilter",
-        filterParams: {
-          values: FILTER_OPTIONS.triageStatus,
-        },
-      },
-      // 3. Severity Risk
-      {
-        headerName: "Severity Risk",
-        field: "severityRisk",
-        width: 120,
-        cellRenderer: SeverityBadgeCellRenderer,
-        comparator: severityRiskComparator,
-        filter: "agSetColumnFilter",
-        filterParams: { values: FILTER_OPTIONS.severityRisk },
-        sort: "asc" as const,
-      },
-      // 4. Source Status
-      {
-        headerName: "Source Status",
+        headerName: "Stage Status",
         field: "status",
-        width: 110,
+        width: 120,
         cellRenderer: SourceStatusBadgeCellRenderer,
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.sourceStatus },
+      },
+      // 2. Age (days)
+      {
+        headerName: "Age (days)",
+        field: "daysOpen",
+        width: 120,
+        type: "numericColumn",
+        cellRenderer: DaysOpenCellRenderer,
+        filter: "agNumberColumnFilter",
+        sort: "desc" as const,
+      },
+      // 3. Lever
+      {
+        headerName: "Lever",
+        field: "lever",
+        width: 220,
+        filter: "agSetColumnFilter",
+        filterParams: { values: LEVERS },
+        tooltipField: "lever",
+      },
+      // 4. Source
+      {
+        headerName: "Source",
+        field: "source",
+        width: 170,
+        filter: "agSetColumnFilter",
+        filterParams: { values: FILTER_OPTIONS.source },
       },
       // 5. CVE
       {
@@ -669,7 +1156,23 @@ export function AgGridTriageTable({
         filter: "agTextColumnFilter",
         tooltipField: "title",
       },
-      // 7. Workstream
+      // 7. External / Internal — derived from gisExternalFlag (Y = External).
+      {
+        headerName: "External / Internal",
+        colId: "externalInternal",
+        width: 150,
+        valueGetter: (p: ValueGetterParams<Vulnerability>) =>
+          !p.data
+            ? ""
+            : p.data.gisExternalFlag === "Y"
+            ? "External"
+            : p.data.gisExternalFlag === "N"
+            ? "Internal"
+            : "",
+        filter: "agSetColumnFilter",
+        filterParams: { values: ["External", "Internal"] },
+      },
+      // 8. Workstream
       {
         headerName: "Workstream",
         field: "workstream",
@@ -677,18 +1180,7 @@ export function AgGridTriageTable({
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.workstream },
       },
-      // 8. Lever — categorisation sibling of Workstream; widest value
-      //    ("CTI/APS&E/EET-Managed Remediation") fits at 220px, tooltip
-      //    rescues anything that gets clipped further.
-      {
-        headerName: "Lever",
-        field: "lever",
-        width: 220,
-        filter: "agSetColumnFilter",
-        filterParams: { values: LEVERS },
-        tooltipField: "lever",
-      },
-      // 9. Technology (combined)
+      // 9. Technology (name + version combined)
       {
         headerName: "Technology",
         colId: "technology",
@@ -700,75 +1192,86 @@ export function AgGridTriageTable({
         cellRenderer: TechnologyCellRenderer,
         filter: "agTextColumnFilter",
       },
-      // 9. Host Name / Server
+      // 10. AIT Number — application / system identifier
+      {
+        headerName: "AIT Number",
+        field: "applicationId",
+        width: 140,
+        filter: "agTextColumnFilter",
+        cellClass: "font-mono text-xs",
+      },
+      // 11. AIT Name — application / system name
+      {
+        headerName: "AIT Name",
+        field: "applicationFullName",
+        width: 220,
+        filter: "agTextColumnFilter",
+        tooltipField: "applicationFullName",
+      },
+      // 12. Owner
+      {
+        headerName: "Owner",
+        field: "vulnOwner",
+        width: 185,
+        cellRenderer: OwnerCellRenderer,
+        filter: "agSetColumnFilter",
+      },
+      // 13. CIO
+      {
+        headerName: "CIO",
+        field: "cioDisplayName",
+        width: 180,
+        filter: "agSetColumnFilter",
+        filterParams: { values: ["James Hartley", "Patricia Owens", "Raj Mehta", "Sandra Corrigan", "Marcus Webb", "Claire Fontaine", "Derek Okonkwo"] },
+      },
+
+      // ── Off by default — toggleable via the Columns panel ──
       {
         headerName: "Host Name / Server",
         field: "hostName",
+        hide: true,
         width: 230,
         filter: "agTextColumnFilter",
         tooltipField: "hostName",
         cellClass: "font-mono text-xs",
       },
-      // 10. Operating Environment
       {
         headerName: "Operating Env",
         field: "operatingEnvironment",
-        width: 135,
+        hide: true,
         cellRenderer: OperatingEnvBadgeCellRenderer,
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.operatingEnvironment },
       },
-      // 11. Days Open
-      {
-        headerName: "Days Open",
-        field: "daysOpen",
-        width: 110,
-        type: "numericColumn",
-        cellRenderer: DaysOpenCellRenderer,
-        filter: "agNumberColumnFilter",
-        sort: "desc" as const,
-      },
-      // 12. Due Date
       {
         headerName: "Due Date",
         field: "dueDate",
-        width: 120,
+        hide: true,
         cellRenderer: DueDateCellRenderer,
         filter: "agDateColumnFilter",
       },
-      // 13. Past Due
       {
         headerName: "Past Due",
         field: "pastDue",
-        width: 90,
+        hide: true,
         cellRenderer: BooleanBadgeCellRenderer,
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.pastDue },
       },
-      // 14. Disposition
       {
         headerName: "Disposition",
         field: "disposition",
-        width: 140,
+        hide: true,
         cellRenderer: DispositionCellRenderer,
         filter: "agSetColumnFilter",
-        filterParams: { values: ["Fix", "Defer", "Mitigate", "Accept Risk", "False Positive"] },
+        filterParams: { values: DISPOSITIONS.map((d) => d.value) },
       },
-      // 15. CRQ #
       {
         headerName: "CRQ #",
         field: "crqNumber",
-        width: 185,
+        hide: true,
         cellRenderer: CRQLinkCellRenderer,
         filter: "agTextColumnFilter",
-      },
-      // 16. Vuln Owner
-      {
-        headerName: "Finding Owner",
-        field: "vulnOwner",
-        width: 185,
-        cellRenderer: OwnerCellRenderer,
-        filter: "agSetColumnFilter",
       },
 
       // ── Hidden columns (toggleable via Columns panel) ──
@@ -794,12 +1297,6 @@ export function AgGridTriageTable({
         type: "numericColumn",
       },
       {
-        headerName: "Application Full Name",
-        field: "applicationFullName",
-        hide: true,
-        filter: "agTextColumnFilter",
-      },
-      {
         headerName: "App Manager Contact",
         field: "applicationManagerContactName",
         hide: true,
@@ -810,20 +1307,6 @@ export function AgGridTriageTable({
         field: "technicalExecutiveContactName",
         hide: true,
         filter: "agTextColumnFilter",
-      },
-      {
-        headerName: "CIO Display Name",
-        field: "cioDisplayName",
-        hide: true,
-        filter: "agSetColumnFilter",
-        filterParams: { values: ["James Hartley", "Patricia Owens", "Raj Mehta", "Sandra Corrigan", "Marcus Webb", "Claire Fontaine", "Derek Okonkwo"] },
-      },
-      {
-        headerName: "Source",
-        field: "source",
-        hide: true,
-        filter: "agSetColumnFilter",
-        filterParams: { values: FILTER_OPTIONS.source },
       },
       {
         headerName: "ESM Type",
@@ -1226,6 +1709,23 @@ export function AgGridTriageTable({
     api.applyTransaction({ update: updated });
   }, []);
 
+  // Rolling patch windows for the bulk-update toolbar dropdown.
+  const patchWindowOptions = useMemo(() => getPatchWindows(), []);
+
+  /**
+   * Shared bulk-update handler — applies a field patch to every selected row
+   * and routes through the (stubbed) bulk-update API.
+   */
+  const applyBulkPatch = useCallback((patch: Partial<Vulnerability>) => {
+    const api = gridRef.current?.api;
+    if (!api) return;
+    const selected = api.getSelectedRows() as Vulnerability[];
+    if (selected.length === 0) return;
+    const updated = selected.map((row) => ({ ...row, ...patch }));
+    bulkUpdateApi(patch, updated);
+    api.applyTransaction({ update: updated });
+  }, []);
+
   const getContextMenuItems = useCallback(
     (params: GetContextMenuItemsParams): (string | MenuItemDef)[] => {
       const col = params.column?.getColId();
@@ -1272,17 +1772,10 @@ export function AgGridTriageTable({
         },
         {
           name: "Set Disposition",
-          subMenu: [
-            ...DISPOSITIONS.filter((d) => d.group === "spec").map((d) => ({
-              name: d.label,
-              action: () => bulkSetDisposition(d.value),
-            })),
-            "separator" as const,
-            ...DISPOSITIONS.filter((d) => d.group === "legacy").map((d) => ({
-              name: d.label,
-              action: () => bulkSetDisposition(d.value),
-            })),
-          ],
+          subMenu: DISPOSITIONS.map((d) => ({
+            name: d.label,
+            action: () => bulkSetDisposition(d.value),
+          })),
         }
       );
 
@@ -1584,6 +2077,14 @@ export function AgGridTriageTable({
           </div>
         )}
 
+        {/* Bulk update toolbar — appears above the grid when rows are selected */}
+        <BulkUpdateToolbar
+          selectedCount={selectedCount}
+          patchWindows={patchWindowOptions}
+          onApplyPatch={applyBulkPatch}
+          onClear={clearSelection}
+        />
+
         {/* Grid (desktop / tablet) — Card list (mobile). Wrapper takes
             flex-1 so it fills the parent flex column; AG Grid's own
             scrollbar handles overflow inside. */}
@@ -1613,7 +2114,7 @@ export function AgGridTriageTable({
           <div className="ag-theme-quartz w-full h-full rounded-md overflow-hidden border border-border/60 vrd-ag-grid flex-1 min-h-0">
             <AgGridReact<Vulnerability>
               ref={gridRef}
-              rowData={vulnerabilities}
+              rowData={openVulnerabilities}
               domLayout="normal"
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
@@ -1677,19 +2178,11 @@ export function AgGridTriageTable({
           open={sheetOpen}
           onOpenChange={onSheetChange}
           onSave={onSave}
-          allVulnerabilities={vulnerabilities}
+          allVulnerabilities={openVulnerabilities}
           onNavigate={onRowSelected}
         />
       )}
 
-      {/* Bulk action bar */}
-      <BulkActionBar
-        selectedCount={selectedCount}
-        onClear={clearSelection}
-        onExportSelected={exportCsv}
-        onAssignOwner={bulkAssignOwner}
-        onSetDisposition={bulkSetDisposition}
-      />
     </>
   );
 }

@@ -32,6 +32,8 @@ export type Disposition =
   | "Mitigate"
   | "Accept Risk"
   | "False Positive"
+  // Catch-all — selecting this reveals a free-text "please provide detail" input.
+  | "Other (please provide detail)"
   | "";
 
 export type OperatingEnvironment = "In Production" | "Pre-Prod" | "Contingency";
@@ -104,12 +106,7 @@ export const DISPOSITIONS: { label: string; value: Disposition; group: "spec" | 
   { label: "NO IMMEDIATE ACTION – No Patch Available, waiting for patch", value: "NO IMMEDIATE ACTION – No Patch Available, waiting for patch", group: "spec" },
   { label: "NO IMMEDIATE ACTION – CTI AIT", value: "NO IMMEDIATE ACTION – CTI AIT", group: "spec" },
   { label: "TEAM 1 ACTION – Baseline ESM-OS Remediation Team", value: "TEAM 1 ACTION – Baseline ESM-OS Remediation Team", group: "spec" },
-  // Legacy
-  { label: "Fix", value: "Fix", group: "legacy" },
-  { label: "Defer", value: "Defer", group: "legacy" },
-  { label: "Mitigate", value: "Mitigate", group: "legacy" },
-  { label: "Accept Risk", value: "Accept Risk", group: "legacy" },
-  { label: "False Positive", value: "False Positive", group: "legacy" },
+  { label: "Other (please provide detail)", value: "Other (please provide detail)", group: "spec" },
 ];
 
 export interface ActivityLogEntry {
@@ -225,6 +222,8 @@ export interface Vulnerability {
   // Triage state (written by this UI)
   triageStatus: TriageStatus;
   disposition: Disposition;
+  /** Free-text detail shown when disposition is "Other (please provide detail)". */
+  dispositionDetail?: string;
   rcManagingTeam: string;
   ctiRemediation: "Yes" | "No" | "";
   requestedPatchWindow: string;
