@@ -108,8 +108,6 @@ const TABLET_VISIBLE_FIELDS = new Set<string>([
 ]);
 
 const FILTER_OPTIONS = {
-  sourceStatus: ["Open", "Closed"],
-  triageStatus: ["Awaiting Disposition", "In Progress", "Pending Clear Scan", "Resolved"],
   severityRisk: ["Priority 1", "Priority 2", "Priority 3", "Priority 4"],
   workstream: ["MiddlewarePatch", "NonQualysCVE", "ADSF", "CloudConfigCompliance"],
   source: [
@@ -466,17 +464,51 @@ function BulkActionBar({
 
 // ── Bulk Update Toolbar ────────────────────────────────────────────────────────
 
+// Wire shape for BulkUpdateVCMExtra. Every field except gisid is optional —
+// only the fields the user staged are sent so the backend doesn't overwrite
+// untouched values.
+interface BulkUpdateItem {
+  gisid: string;
+  disposition?: string;
+  requestedPatchWindow?: string;
+  expectedRemediationDate?: string; // .NET datetime, e.g. "2026-07-15T00:00:00"
+  crq?: string;
+  identifiedBlockers?: string; // delimiter TBD with backend
+}
+
+interface BulkUpdatePayload {
+  items: BulkUpdateItem[];
+  updatedUserId?: number;
+}
+
+// Maps a FE patch (Partial<Vulnerability>) + gisid to one wire item.
+// Handles the FE↔API name/type/format gaps: crqNumber→crq, Blocker[]→string,
+// YYYY-MM-DD→ISO datetime.
+function patchToApiItem(gisid: string, patch: Partial<Vulnerability>): BulkUpdateItem {
+  const item: BulkUpdateItem = { gisid };
+  if (patch.disposition !== undefined) item.disposition = patch.disposition;
+  if (patch.requestedPatchWindow !== undefined) {
+    item.requestedPatchWindow = patch.requestedPatchWindow;
+  }
+  if (patch.expectedRemediationDate !== undefined) {
+    item.expectedRemediationDate = patch.expectedRemediationDate
+      ? `${patch.expectedRemediationDate}T00:00:00`
+      : "";
+  }
+  if (patch.crqNumber !== undefined) item.crq = patch.crqNumber;
+  if (patch.identifiedBlockers !== undefined) {
+    item.identifiedBlockers = patch.identifiedBlockers.join("; ");
+  }
+  return item;
+}
+
 /**
- * Shared bulk-update handler — STUB. Wire this to the real bulk-update API
- * endpoint once it exists. For now it just logs the intended change.
+ * Shared bulk-update handler — STUB. Wire this to the real BulkUpdateVCMExtra
+ * endpoint once integrated. The 200 response body is empty; treat success as
+ * status 200 with no JSON parse.
  */
-function bulkUpdateApi(patch: Partial<Vulnerability>, rows: Vulnerability[]): void {
-  console.info(
-    `[bulk-update stub] applying`,
-    patch,
-    `to ${rows.length} finding(s):`,
-    rows.map((r) => r.id)
-  );
+function bulkUpdateApi(payload: BulkUpdatePayload): void {
+  console.info(`[bulk-update stub] payload:`, payload);
 }
 
 // Shared styling for the native <select>/<textarea> in the disposition popover.
@@ -484,24 +516,21 @@ const BULK_FIELD_CLASS =
   "w-full rounded-md border border-input bg-transparent px-2 py-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 // Staged disposition + its conditional dependent fields, edited in the popover.
+// Only fields that map to BulkUpdateVCMExtra are kept (disposition, crq,
+// remediationDate, blockers). Per-row context like detail/justification/
+// false-positive reason has no API home and was removed from this path.
 interface DispositionDraft {
   disposition: Disposition;
-  detail: string;
   remediationDate: string;
   crq: string;
   blockers: Blocker[];
-  justification: string;
-  fpReason: string;
 }
 
 const EMPTY_DISPOSITION_DRAFT: DispositionDraft = {
   disposition: "",
-  detail: "",
   remediationDate: "",
   crq: "",
   blockers: [],
-  justification: "",
-  fpReason: "",
 };
 
 // Required dependent fields still empty for the chosen disposition — mirrors
@@ -513,16 +542,12 @@ function missingDispositionFields(
   if (!d.disposition) return [];
   const rules = dispositionFields[d.disposition] ?? {};
   const missing: string[] = [];
-  if (d.disposition === "Other (please provide detail)" && !d.detail?.trim()) {
-    missing.push("Detail");
-  }
   // Patch Window is the toolbar's standalone control — checked here, not
   // collected in the popover, so the user only ever sets it once.
   if (rules.patchWindow && !patchWindowStaged) missing.push("Patch Window");
   if (rules.remediationDate && !d.remediationDate) missing.push("Remediation Date");
   if (rules.crq && !d.crq.trim()) missing.push("CRQ");
   if (rules.blockers && d.blockers.length === 0) missing.push("Blockers");
-  if (rules.justification && !d.justification.trim()) missing.push("Justification");
   return missing;
 }
 
@@ -537,11 +562,6 @@ function dispositionDraftToPatch(d: DispositionDraft): Partial<Vulnerability> {
   if (rules.remediationDate) patch.expectedRemediationDate = d.remediationDate;
   if (rules.crq) patch.crqNumber = d.crq;
   if (rules.blockers) patch.identifiedBlockers = d.blockers;
-  if (rules.justification) patch.deferralJustification = d.justification;
-  if (rules.falsePositive && d.fpReason.trim()) patch.falsePositiveReason = d.fpReason;
-  if (d.disposition === "Other (please provide detail)") {
-    patch.dispositionDetail = d.detail ?? "";
-  }
   return patch;
 }
 
@@ -668,19 +688,12 @@ function BulkDispositionPopover({
           <TooltipContent className="bg-zinc-900 text-white max-w-xs">
             <div className="space-y-0.5">
               <div>Disposition: {draft.disposition}</div>
-              {draft.detail && <div>Detail: {draft.detail}</div>}
               {draft.remediationDate && (
                 <div>Remediation Date: {draft.remediationDate}</div>
               )}
               {draft.crq && <div>CRQ: {draft.crq}</div>}
               {draft.blockers.length > 0 && (
                 <div>Blockers: {draft.blockers.join(", ")}</div>
-              )}
-              {draft.justification && (
-                <div>Justification: {draft.justification}</div>
-              )}
-              {draft.fpReason && (
-                <div>False-positive reason: {draft.fpReason}</div>
               )}
             </div>
           </TooltipContent>
@@ -705,20 +718,6 @@ function BulkDispositionPopover({
             ))}
           </select>
         </div>
-
-        {draft.disposition === "Other (please provide detail)" && (
-          <div>
-            <Label className="text-xs font-medium mb-1 block">
-              Please provide detail <span className="text-red-500">*</span>
-            </Label>
-            <textarea
-              value={draft.detail ?? ""}
-              onChange={(e) => set({ detail: e.target.value })}
-              rows={3}
-              className={`${BULK_FIELD_CLASS} resize-none`}
-            />
-          </div>
-        )}
 
         {rules.patchWindow && (
           <p className="text-[11px] text-muted-foreground">
@@ -778,34 +777,6 @@ function BulkDispositionPopover({
           </div>
         )}
 
-        {rules.justification && (
-          <div>
-            <Label className="text-xs font-medium mb-1 block">
-              Justification <span className="text-red-500">*</span>
-            </Label>
-            <textarea
-              value={draft.justification}
-              onChange={(e) => set({ justification: e.target.value })}
-              rows={3}
-              className={`${BULK_FIELD_CLASS} resize-none`}
-            />
-          </div>
-        )}
-
-        {rules.falsePositive && (
-          <div>
-            <Label className="text-xs font-medium mb-1 block">
-              False-positive reason
-            </Label>
-            <textarea
-              value={draft.fpReason}
-              onChange={(e) => set({ fpReason: e.target.value })}
-              rows={2}
-              className={`${BULK_FIELD_CLASS} resize-none`}
-            />
-          </div>
-        )}
-
         {incomplete && (
           <p className="text-[11px] text-red-500">
             Required before this can be applied: {missing.join(", ")}
@@ -840,8 +811,6 @@ function BulkUpdateToolbar({
   onApplyPatch: (patch: Partial<Vulnerability>) => void;
   onClear: () => void;
 }) {
-  const [lever, setLever] = useState("");
-  const [owner, setOwner] = useState("");
   const [patchWindow, setPatchWindow] = useState("");
   const [dispDraft, setDispDraft] = useState<DispositionDraft>(
     EMPTY_DISPOSITION_DRAFT
@@ -854,16 +823,12 @@ function BulkUpdateToolbar({
 
   const patch: Partial<Vulnerability> = {
     ...(dispIncomplete ? {} : dispositionDraftToPatch(dispDraft)),
-    ...(lever ? { lever: lever as Lever } : {}),
-    ...(owner ? { vulnOwner: owner } : {}),
     ...(patchWindow ? { requestedPatchWindow: patchWindow } : {}),
   };
   const stagedCount = Object.keys(patch).length;
   const canApply = stagedCount > 0 && !dispIncomplete;
 
   const resetStaged = () => {
-    setLever("");
-    setOwner("");
     setPatchWindow("");
     setDispDraft(EMPTY_DISPOSITION_DRAFT);
   };
@@ -883,12 +848,6 @@ function BulkUpdateToolbar({
       <span className="text-xs font-semibold">
         Bulk update — {selectedCount} row{selectedCount !== 1 ? "s" : ""} selected:
       </span>
-      <BulkStageSelect
-        label="Lever"
-        options={LEVERS}
-        value={lever}
-        onChange={setLever}
-      />
       <BulkDispositionPopover
         draft={dispDraft}
         missing={dispMissing}
@@ -899,12 +858,6 @@ function BulkUpdateToolbar({
         options={patchWindows}
         value={patchWindow}
         onChange={setPatchWindow}
-      />
-      <BulkStageSelect
-        label="Owner"
-        options={USERS.map((u) => u.name)}
-        value={owner}
-        onChange={setOwner}
       />
       <Button
         size="sm"
@@ -1025,8 +978,6 @@ export function AgGridTriageTable({
       for (const [key, vals] of Object.entries(filters) as [FilterKey, Set<string>][]) {
         if (!vals.size) continue;
         const fieldMap: Partial<Record<FilterKey, string>> = {
-          sourceStatus: v.status,
-          triageStatus: v.triageStatus,
           severityRisk: v.severityRisk,
           workstream: v.workstream,
           source: v.source,
@@ -1110,7 +1061,7 @@ export function AgGridTriageTable({
         width: 120,
         cellRenderer: SourceStatusBadgeCellRenderer,
         filter: "agSetColumnFilter",
-        filterParams: { values: FILTER_OPTIONS.sourceStatus },
+        filterParams: { values: ["Open", "Closed"] },
       },
       // 2. Age (days)
       {
@@ -1721,9 +1672,17 @@ export function AgGridTriageTable({
     if (!api) return;
     const selected = api.getSelectedRows() as Vulnerability[];
     if (selected.length === 0) return;
-    const updated = selected.map((row) => ({ ...row, ...patch }));
-    bulkUpdateApi(patch, updated);
-    api.applyTransaction({ update: updated });
+    // FE `id` is the API's `gisid` (mapped from SQL GISID — see
+    // docs/vuln-data-collection-plan.md). Rename end-to-end when the
+    // response-mapper layer lands.
+    const items = selected.map((row) => patchToApiItem(row.id, patch));
+    // TODO(nx-monorepo): set `updatedUserId` from AuthContext
+    // (`useAuth().user.id`) when this component is integrated into the
+    // monorepo. Standalone dev omits the field.
+    bulkUpdateApi({ items });
+    api.applyTransaction({
+      update: selected.map((row) => ({ ...row, ...patch })),
+    });
   }, []);
 
   const getContextMenuItems = useCallback(
@@ -1794,8 +1753,6 @@ export function AgGridTriageTable({
   }, []);
 
   const filterLabels: Record<FilterKey, string> = {
-    sourceStatus: "Source Status",
-    triageStatus: "Triage Status",
     severityRisk: "Severity",
     workstream: "Workstream",
     source: "Source",
