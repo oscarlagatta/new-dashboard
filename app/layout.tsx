@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono, DM_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ResizeObserverFix } from '@/components/resize-observer-fix'
 import { Toaster } from '@/components/ui/sonner'
+import { Providers } from './providers'
 import './globals.css'
 
 const _inter = Inter({ subsets: ["latin"], variable: "--font-sans-inter" });
@@ -41,12 +42,14 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${dmSans.variable} font-sans antialiased`}>
         <ResizeObserverFix />
-        <div
-          className="src-dashboard"
-          style={{ backgroundColor: "#F7F8FA", color: "#111827", minHeight: "100dvh" }}
-        >
-          {children}
-        </div>
+        <Providers>
+          <div
+            className="src-dashboard"
+            style={{ backgroundColor: "#F7F8FA", color: "#111827", minHeight: "100dvh" }}
+          >
+            {children}
+          </div>
+        </Providers>
         <Toaster richColors position="bottom-right" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
