@@ -931,7 +931,100 @@ Pick (1) if the backend rev cadence is slow; (3) if it's daily.
 - The `NEXT_PUBLIC_API_AUTH_TOKEN` env-var path — replaced by the AuthContext bridge in §12.4.
 - The hard-coded `baseURL: ''` fallback — the monorepo always has a real base URL.
 
-### 12.10 Effort budget
+### 12.10 Application files changed after the HeyAPI setup commit
+
+Reference: `git diff --name-status ab9b699..HEAD` (HeyAPI setup commit → HEAD). Three application commits land in this range:
+
+| Commit | Subject |
+|---|---|
+| `a1234fb` | chore(ui): remove legacy vulnerability components for streamlined maintenance |
+| `44b703a` | chore(build): update `tsconfig.tsbuildinfo` (despite the name, also touches `app/page.tsx`, `ag-grid-table.tsx`, `detail-sheet.tsx`) |
+| `ab4df87` | doc(migration): add Phase 12 guide *(doc-only — ignore for porting)* |
+
+Group the work into four buckets when porting:
+
+#### A. Bridge layer — **net-new, must port** (the whole point of this phase)
+
+Composes the generated SDK + TanStack Query into FE-shaped hooks. Components consume these, never the raw `generated/*`.
+
+| Demo path | → | Monorepo path (data-access lib) | Notes |
+|---|---|---|---|
+| `lib/api/adapters.ts` | → | `src/lib/api/adapters.ts` | FE↔API type/format normalization (date sentinels, enum gaps, bulk-update item shaping). Imports `@/lib/types` and the generated SDK types — keep both import paths aligned to the monorepo layout. |
+| `lib/api/hooks.ts` | → | `src/lib/api/hooks.ts` | `"use client"` — `useVulnerabilities`, `useFilterOptions`, bulk-update mutation. Wraps the generated `VulnerabilityCm` class with adapters and a `QUERY_KEYS` map. Delete `"use client"` on paste if the host bundler is Vite. |
+| `lib/api/responses.ts` | → | `src/lib/api/responses.ts` | Hand-rolled response types (`GetVulnerabilityCmResponse`, `VulnerabilityFilterOptionsResponse`, `ApiVulnerabilityRow`) because the OpenAPI spec declares 200 bodies as `unknown`. **When the backend tightens the spec, regenerate and delete this file.** |
+| `lib/api/runtime-config.ts` | → | `src/lib/api/runtime-config.ts` | **Already covered in §12.1 / §12.4** — note that commit `a1234fb` is what added the `TODO(nx-monorepo)` markers, the auth shim, and the same-origin baseURL fallback. Replace per §12.4 on paste. |
+
+Re-export surface (`src/index.ts` of the data-access lib):
+
+```ts
+export * from './lib/api/hooks';          // useVulnerabilities, useFilterOptions, useBulkUpdate
+export * from './lib/api/adapters';       // fromApiRow, toApiFilter, toBulkUpdateItems, UiVulnerabilityFilters
+export type * from './lib/api/responses'; // ApiVulnerabilityRow, GetVulnerabilityCmResponse, etc.
+export type * from './lib/api/generated/types.gen'; // raw SDK types if a consumer needs them
+```
+
+#### B. Application components — modified, must port
+
+These are the demo files where mock-data reads were swapped for the new hooks. Port from the file at HEAD (post-`a1234fb` + `44b703a`); ignore the legacy-deletion noise in the diffs.
+
+| Demo path | → | Monorepo path (feature lib) | What changed |
+|---|---|---|---|
+| `app/page.tsx` | → | `src/lib/pages/App.tsx` (per Phase 2) | Now reads from `useVulnerabilities` / `useFilterOptions` instead of importing `mock-data` directly; sidebar/page-default behavior preserved from Phase 10. |
+| `components/executive/ag-grid-table.tsx` | → | `src/lib/components/executive/ag-grid-table.tsx` | **Major rewrite.** Row data + filter options now come from hooks; the local "Closed-row filter" / 4-pill filter bar / bulk-update toolbar from Phase 11 are still here, now wired to the `useBulkUpdate` mutation. The demo's mock-data import is gone. |
+| `components/vulnerability/detail-sheet.tsx` | → | `src/lib/components/vulnerability/detail-sheet.tsx` | **Major changes** in `TriageForm`: submit now goes through the bulk-update mutation (single-row patch) instead of mutating a local mock object; loading/error UI added. Phase 11's "Other" disposition handling is preserved. |
+| `components/executive/vulnerability-card.tsx` | → | `src/lib/components/executive/vulnerability-card.tsx` | Small adjustments to consume the API-shaped row (renamed/normalized fields after `fromApiRow`). |
+| `components/dashboard/blockers-strip.tsx` | → | `src/lib/components/dashboard/blockers-strip.tsx` | Minor: same field-name alignment. |
+| `lib/types.ts` | → | `src/lib/types/index.ts` (or `src/lib/types.ts`) | Updated to align with the API shapes that `adapters.ts` produces. **Diff against the Phase 11 version of `types.ts`** before pasting — the new fields are additive but a few unions widened. |
+| `lib/filter-presets.ts` | → | `src/lib/constants/filter-presets.ts` | Adjusted to match the filter-options endpoint payload (option labels/values). |
+| `lib/mock-data.ts` | → | `src/lib/constants/mock-data.ts` *(if you keep any of it)* | Slimmed down — most of the dataset moved into the mock-API layer (which doesn't ship). Strip further on paste: only keep what the UI still imports at compile time (`CIO_TEAMS`, lookup tables). |
+
+#### C. Files to **NOT** port (mock-backend scaffolding — superseded by the real backend)
+
+| Demo path | Why it's not needed |
+|---|---|
+| `app/api/v2/VulnerabilityCm/BulkUpdateVCMExtra/route.ts` | Next.js route handler — mock backend; monorepo hits the real endpoint via `baseURL`. |
+| `app/api/v2/VulnerabilityCm/GetVulnerabilityCM/route.ts` | Same. |
+| `app/api/v2/VulnerabilityCm/VulnerabilityFilterOption/route.ts` | Same. |
+| `lib/mock-api/data.ts` | In-memory dataset that powers the three routes above. Skip. |
+| `openapi.json` *(currently staged at repo root, not yet committed)* | Spec lives in the monorepo per §12.7 — either committed to the data-access lib or fetched at codegen time. Don't carry this copy across. |
+
+#### D. Files **deleted** in `a1234fb` — confirm they aren't ported
+
+If any of these were already pasted into the monorepo during Phase 2, delete them in the same PR as the bridge-layer wiring. None of them are reachable from `app/page.tsx` after `a1234fb`.
+
+| Deleted path |
+|---|
+| `components/executive/action-required-panel.tsx` |
+| `components/executive/awaiting-scan-card.tsx` |
+| `components/vulnerability/charts-panel.tsx` |
+| `components/vulnerability/severity-status-chart.tsx` |
+| `components/vulnerability/status-badge.tsx` |
+| `components/vulnerability/vulnerability-table.tsx` |
+
+#### E. Recommended apply order in the monorepo
+
+1. **Data-access lib first** — paste bucket A (`adapters.ts`, `responses.ts`, `hooks.ts`, `runtime-config.ts`), generate the SDK (§12.6), confirm it compiles in isolation (`nx build data-access-findings`).
+2. **Types + filter-presets** — paste `lib/types.ts` and `lib/filter-presets.ts` updates into the feature lib so subsequent component changes typecheck.
+3. **Feature components, leaf-first** — `vulnerability-card.tsx` → `blockers-strip.tsx` → `detail-sheet.tsx` → `ag-grid-table.tsx` → `app/page.tsx` (last). This is dependency order; doing the page first leaves it red until everything else lands.
+4. **Delete bucket D files** (if present in the feature lib).
+5. **Verify with §12.8 checklist**, then move on to the broader feature migration in Phases 2–11.
+
+#### F. Quick copy commands
+
+To inspect each commit's full diff while pasting:
+
+```bash
+git -C /Users/oscarlagatta/sandbox/new-dashboard show a1234fb -- lib/api/hooks.ts
+git -C /Users/oscarlagatta/sandbox/new-dashboard show a1234fb -- components/executive/ag-grid-table.tsx
+git -C /Users/oscarlagatta/sandbox/new-dashboard show 44b703a -- components/vulnerability/detail-sheet.tsx
+# …etc
+```
+
+Or get the file at HEAD (post-all-commits) directly with `cat lib/api/<file>` — that's the version to copy.
+
+---
+
+### 12.11 Effort budget
 
 Reduced because `axios` + TanStack Query (and the host `QueryClientProvider`) are already in place — only the codegen wiring is new work.
 
@@ -941,5 +1034,6 @@ Reduced because `axios` + TanStack Query (and the host `QueryClientProvider`) ar
 | Paste `openapi-ts.config.ts` + `runtime-config.ts` + generated folder | 10 min |
 | Wire `setApiAuthToken` bridge into the existing host auth flow | 15 min |
 | Add Nx `generate` target + first cached run | 10 min |
-| Rewire one feature query to use the SDK end-to-end (smoke test) | 30 min |
-| **Subtotal** | ~1.25 hr before broad feature migration to real data |
+| Paste bucket A (bridge layer) + smoke-test one query end-to-end | 30 min |
+| Paste bucket B (modified components) leaf-first per §12.10 E | 60–90 min |
+| **Subtotal** | ~2.5 hr to first real-backend page render |
