@@ -757,3 +757,189 @@ Biggest time sink: alias rewrites. After the folder skeleton is in place, a sing
 - `@/components/vulnerability/` → `./` or `../components/vulnerability/`
 - `@/components/dashboard/` → `./` or `../components/dashboard/`
 - `@/hooks/` → `../hooks/`
+
+---
+
+## Phase 12 — HeyAPI client (axios) + TanStack Query wiring
+
+Generated in this repo after running `npm run generate:api`. The demo points its baseURL at same-origin (so `app/api/v2/VulnerabilityCm/*` mock handlers serve responses). In the monorepo, the same generated SDK + hooks point at the real backend and consume the host's auth context.
+
+> **Monorepo state:** `axios`, `@tanstack/react-query`, and the host-level `<QueryClientProvider>` are already in place. This phase only adds the **HeyAPI codegen + the generated SDK + the runtime-config bridge**. Skip §12.2 install step for `axios` / `@tanstack/react-query` (only `@hey-api/openapi-ts` and `prettier` are new). Skip §12.5 entirely — there's nothing to mount, only the demo's local provider/QueryClient files to delete on paste.
+
+### 12.1 Files added in this repo
+
+| Source (this repo) | → | Destination (monorepo) | Notes |
+|---|---|---|---|
+| `openapi-ts.config.ts` | → | **tool config in the lib that owns the SDK** (e.g. `libs/bps-findings-management/data-access/data-access-findings/openapi-ts.config.ts`) | Codegen lives next to the lib whose `src/lib/api/generated/` it writes into. Adjust `input` to the monorepo's spec source (URL or local file). Adjust `output.path` to the lib's `src/lib/api/generated`. Keep `runtimeConfigPath` relative to the config file. |
+| `lib/api/runtime-config.ts` | → | `src/lib/api/runtime-config.ts` (same lib as the SDK) | **Edit on paste — the `getAuthToken()` shim is a placeholder.** Replace with a read from the host's AuthContext (the file already carries a `TODO(nx-monorepo)` marker). See §12.4. |
+| `lib/api/query-client.ts` | → | **drop** | The host app already provides a `QueryClient`. Do not ship a competing one from the lib. See §12.5. |
+| `app/providers.tsx` | → | **drop** | Same reason — host owns the `QueryClientProvider`. |
+| `lib/api/generated/**` (entire folder — `client.gen.ts`, `sdk.gen.ts`, `types.gen.ts`, `schemas.gen.ts`, `index.ts`, `client/`, `core/`, `@tanstack/react-query.gen.ts`) | → | `src/lib/api/generated/**` | Verbatim. Regenerated, not hand-edited. Add the folder to `.eslintignore` and `.prettierignore` inside the lib. |
+| `package.json` script: `"generate:api": "openapi-ts"` | → | add as a `nx` target on the data-access lib (e.g. `nx run data-access-findings:generate`) or as a workspace-level npm script | See §12.6 for the executor pattern. |
+
+### 12.2 Peer deps to add to the monorepo
+
+`axios`, `@tanstack/react-query`, and `@tanstack/react-query-devtools` are **already installed** in the workspace — leave them alone. Only the codegen toolchain is new:
+
+```
+npm i -D @hey-api/openapi-ts prettier
+```
+
+Notes:
+- **Do not** install `@hey-api/client-axios` as a separate package — it's deprecated and bundled inside `@hey-api/openapi-ts` since v0.73. The generated `client/` folder *is* the runtime.
+- `prettier` is required because `openapi-ts.config.ts` runs the `prettier` post-processor over the generated output. If the monorepo already has prettier installed at the root, skip this. If it standardizes on a different formatter, replace `postProcess: ['prettier']` with `postProcess: []` and let the workspace formatter handle it on commit.
+- **TanStack Query version check** — before generating, confirm the host's installed `@tanstack/react-query` major version. The generated `@tanstack/react-query.gen.ts` imports are compatible with v4 and v5, but the demo was generated against v5. If the host is on v4, regenerate after install — don't ship the v5-generated artifact against a v4 runtime.
+
+### 12.3 Library boundaries (Nx)
+
+Recommended layout — keep the SDK separate from the feature so feature libs only depend on the data-access surface, not on `axios` or the generated artifacts:
+
+```
+libs/bps-findings-management/
+├── data-access/
+│   └── data-access-findings/                        # owns the SDK + hooks
+│       ├── openapi-ts.config.ts
+│       ├── src/
+│       │   ├── index.ts                             # public surface — re-exports from api/
+│       │   └── lib/
+│       │       └── api/
+│       │           ├── runtime-config.ts            # consumes host AuthContext
+│       │           └── generated/                   # heyapi output (gitignored or committed — team call)
+│       └── project.json                             # tags: ["scope:findings-management", "type:data-access"]
+└── features/
+    └── feature-findings-remediation/                # consumes via @bofa/data-access-findings
+```
+
+`src/index.ts` of the data-access lib should re-export **only** the SDK functions and React Query options, not `axios` itself:
+
+```ts
+// libs/.../data-access-findings/src/index.ts
+export * from './lib/api/generated/sdk.gen';
+export * from './lib/api/generated/@tanstack/react-query.gen';
+export type * from './lib/api/generated/types.gen';
+```
+
+Then in the feature lib (`feature-findings-remediation`):
+
+```ts
+import { useQuery } from '@tanstack/react-query';
+import { getVulnerabilitiesOptions } from '@bofa/data-access-findings';
+```
+
+Add a dependency-constraint rule in `nx.json` if not already present:
+
+```json
+{
+  "sourceTag": "type:feature",
+  "onlyDependOnLibsWithTags": ["type:feature", "type:data-access", "type:ui", "type:util"]
+}
+```
+
+### 12.4 `runtime-config.ts` — wiring to the host AuthContext
+
+The shim in this repo reads `process.env.NEXT_PUBLIC_API_AUTH_TOKEN` because the demo has no auth provider. In the monorepo, the file becomes a thin adapter over the host's auth.
+
+Pattern (Vite + a host `useAuth()` hook):
+
+```ts
+// src/lib/api/runtime-config.ts
+import type { CreateClientConfig } from './generated/client.gen';
+
+// Module-level token cache; set by the host on auth state change (see below).
+let currentToken: string | undefined;
+
+export function setApiAuthToken(token: string | undefined): void {
+  currentToken = token;
+}
+
+export const createClientConfig: CreateClientConfig = (config) => ({
+  ...config,
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  withCredentials: false,
+  auth: () => currentToken,
+});
+```
+
+Then in the host (`apps/bps-hub/src/app/providers.tsx` or wherever auth state lives), push the token in on every change:
+
+```tsx
+import { setApiAuthToken } from '@bofa/data-access-findings';
+
+function ApiAuthBridge() {
+  const { token } = useAuth();
+  useEffect(() => { setApiAuthToken(token); }, [token]);
+  return null;
+}
+```
+
+Mount `<ApiAuthBridge />` once inside the host's `<QueryClientProvider>`. This pattern avoids the lib needing to import the host's auth module directly (no Nx boundary violations) while keeping the token live.
+
+If the host is on Next.js (App Router) rather than Vite: swap `import.meta.env.VITE_API_BASE_URL` for `process.env.NEXT_PUBLIC_API_BASE_URL` and keep everything else the same.
+
+### 12.5 QueryClientProvider — host already owns it
+
+Confirmed already mounted in `apps/bps-hub`. **Do not** port `app/providers.tsx` or `lib/api/query-client.ts` from this repo. Mounting a second `QueryClientProvider` inside the feature lib would create a parallel cache (queries fired from the feature lib wouldn't be visible to host devtools, hydration, or cross-feature cache reuse).
+
+Sanity check before pasting: grep the host for `QueryClientProvider` and verify the `defaultOptions` (`staleTime`, `retry`, `refetchOnWindowFocus`) are reasonable for the findings feature. If they aren't, change them on the **host's** client, not by introducing a second one.
+
+### 12.6 Codegen target (Nx)
+
+Wire the generator as an Nx target on the data-access lib so it participates in the task graph and caches by spec hash:
+
+```jsonc
+// libs/bps-findings-management/data-access/data-access-findings/project.json
+{
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "openapi-ts",
+        "cwd": "libs/bps-findings-management/data-access/data-access-findings"
+      },
+      "inputs": ["{projectRoot}/openapi-ts.config.ts", "{workspaceRoot}/openapi.json"],
+      "outputs": ["{projectRoot}/src/lib/api/generated"],
+      "cache": true
+    }
+  }
+}
+```
+
+Run: `nx run data-access-findings:generate`. The `outputs` declaration lets Nx skip regeneration when the spec is unchanged.
+
+### 12.7 Spec sourcing
+
+The demo uses `./openapi.json` (file in repo root). In the monorepo, options in preference order:
+
+1. **Commit the spec into the data-access lib** (`libs/.../data-access-findings/openapi.json`) and update CI to refresh it nightly from the backend. Best for reproducibility and offline dev.
+2. **Pull from a URL at generation time** — set `input` to the backend's swagger URL. Requires network at codegen time; deployment-blocking if the backend is down.
+3. **Hybrid** — script in the lib that downloads the spec into a gitignored path, then runs `openapi-ts`. Captures the "always fresh" benefit without making codegen network-dependent in CI.
+
+Pick (1) if the backend rev cadence is slow; (3) if it's daily.
+
+### 12.8 What to verify in the monorepo after paste
+
+- [ ] `nx run data-access-findings:generate` produces `src/lib/api/generated/**` with no Prettier errors.
+- [ ] `nx lint data-access-findings` passes (generated folder is in `.eslintignore`).
+- [ ] `nx run data-access-findings:test` (if any tests) — imports from `@bofa/data-access-findings` resolve.
+- [ ] Feature lib (`feature-findings-remediation`) compiles after replacing demo mock-data reads with `useQuery(getXxxOptions(...))` calls.
+- [ ] In the running host app: open Network tab, hit a feature page, confirm the request lands on the real backend URL (`VITE_API_BASE_URL` / `NEXT_PUBLIC_API_BASE_URL`) with the `Authorization` header populated by `setApiAuthToken`.
+- [ ] React Query Devtools (mounted by the host) shows queries originating from the feature lib — confirms the single-provider wiring.
+
+### 12.9 What to *not* port
+
+- The `app/api/v2/VulnerabilityCm/*` mock route handlers (Next.js-only and unnecessary once the SDK points at the real backend).
+- The `NEXT_PUBLIC_API_AUTH_TOKEN` env-var path — replaced by the AuthContext bridge in §12.4.
+- The hard-coded `baseURL: ''` fallback — the monorepo always has a real base URL.
+
+### 12.10 Effort budget
+
+Reduced because `axios` + TanStack Query (and the host `QueryClientProvider`) are already in place — only the codegen wiring is new work.
+
+| Step | Time |
+|---|---|
+| Generate `data-access-findings` lib + add `@hey-api/openapi-ts` to devDeps | 10 min |
+| Paste `openapi-ts.config.ts` + `runtime-config.ts` + generated folder | 10 min |
+| Wire `setApiAuthToken` bridge into the existing host auth flow | 15 min |
+| Add Nx `generate` target + first cached run | 10 min |
+| Rewire one feature query to use the SDK end-to-end (smoke test) | 30 min |
+| **Subtotal** | ~1.25 hr before broad feature migration to real data |
