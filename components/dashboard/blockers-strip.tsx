@@ -29,7 +29,8 @@ function aggregate(vulns: Vulnerability[]) {
   const counts = new Map<Blocker, number>();
   let blockedRecords = 0;
   for (const v of vulns) {
-    if (v.triageStatus === "Resolved") continue;
+    // Skip closed findings — they're no longer blocking anything.
+    if (v.status === "Closed") continue;
     if (v.identifiedBlockers.length === 0) continue;
     blockedRecords += 1;
     for (const b of v.identifiedBlockers) {

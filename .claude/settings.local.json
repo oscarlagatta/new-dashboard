@@ -63,7 +63,8 @@
       "Bash(Select-Object -First 50)",
       "Bash(Format-Table FullName, PSIsContainer)",
       "Bash(npx --no-install eslint .)",
-      "Bash(npx --no-install tsc --noEmit)"
+      "Bash(npx --no-install tsc --noEmit)",
+      "Bash(mkdir -p /Users/oscarlagatta/.claude/projects/-Users-oscarlagatta-sandbox-new-dashboard/memory/)"
     ]
   }
 }

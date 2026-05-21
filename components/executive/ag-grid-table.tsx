@@ -121,7 +121,6 @@ const FILTER_OPTIONS = {
     "Nextgen BMP",
   ],
   operatingEnvironment: ["In Production", "Pre-Prod", "Contingency"],
-  pastDue: ["Y", "N"],
 };
 
 type FilterKey = keyof typeof FILTER_OPTIONS;
@@ -982,18 +981,18 @@ export function AgGridTriageTable({
           workstream: v.workstream,
           source: v.source,
           operatingEnvironment: v.operatingEnvironment,
-          pastDue: v.pastDue,
         };
         const cell = fieldMap[key] ?? "";
         if (!vals.has(cell)) return false;
       }
       if (filterPreset && !matchesPreset(v, filterPreset, settings)) return false;
-      // Header CIO and Lever scopes AND with the toolbar filters and preset.
+      // Header CIO scope ANDs with toolbar filters and preset. Lever scope/
+      // filter state still exists in the UI but the API no longer returns a
+      // `lever` field — the filter is a no-op until the CIO/CIO-1 cascade
+      // API update reintroduces it.
       if (cioScope && v.cioDisplayName !== cioScope) return false;
-      if (leverScope && v.lever !== leverScope) return false;
       // Work Queue top-bar pill filters — also ANDed with everything above.
       if (cioFilter && v.cioDisplayName !== cioFilter) return false;
-      if (leverFilter && v.lever !== leverFilter) return false;
       if (connectivityFilter) {
         const isExternal = v.gisExternalFlag === "Y";
         if (connectivityFilter === "External" && !isExternal) return false;
@@ -1035,7 +1034,7 @@ export function AgGridTriageTable({
     if (!isMobile) return [] as Vulnerability[];
     const q = quickFilter.trim().toLowerCase();
     const haystack = (v: Vulnerability) =>
-      [v.cve, v.hostName, v.applicationFullName, v.title, v.workstream, v.vulnOwner]
+      [v.cve, v.hostName, v.applicationFullName, v.title, v.workstream]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -1063,26 +1062,7 @@ export function AgGridTriageTable({
         filter: "agSetColumnFilter",
         filterParams: { values: ["Open", "Closed"] },
       },
-      // 2. Age (days)
-      {
-        headerName: "Age (days)",
-        field: "daysOpen",
-        width: 120,
-        type: "numericColumn",
-        cellRenderer: DaysOpenCellRenderer,
-        filter: "agNumberColumnFilter",
-        sort: "desc" as const,
-      },
-      // 3. Lever
-      {
-        headerName: "Lever",
-        field: "lever",
-        width: 220,
-        filter: "agSetColumnFilter",
-        filterParams: { values: LEVERS },
-        tooltipField: "lever",
-      },
-      // 4. Source
+      // 2. Source
       {
         headerName: "Source",
         field: "source",
@@ -1131,19 +1111,7 @@ export function AgGridTriageTable({
         filter: "agSetColumnFilter",
         filterParams: { values: FILTER_OPTIONS.workstream },
       },
-      // 9. Technology (name + version combined)
-      {
-        headerName: "Technology",
-        colId: "technology",
-        width: 200,
-        valueGetter: (p: ValueGetterParams<Vulnerability>) =>
-          p.data
-            ? `${p.data.technology}${p.data.technologyVersion ? " " + p.data.technologyVersion : ""}`
-            : "",
-        cellRenderer: TechnologyCellRenderer,
-        filter: "agTextColumnFilter",
-      },
-      // 10. AIT Number — application / system identifier
+      // 9. AIT Number — application / system identifier
       {
         headerName: "AIT Number",
         field: "applicationId",
@@ -1159,15 +1127,7 @@ export function AgGridTriageTable({
         filter: "agTextColumnFilter",
         tooltipField: "applicationFullName",
       },
-      // 12. Owner
-      {
-        headerName: "Owner",
-        field: "vulnOwner",
-        width: 185,
-        cellRenderer: OwnerCellRenderer,
-        filter: "agSetColumnFilter",
-      },
-      // 13. CIO
+      // 12. CIO
       {
         headerName: "CIO",
         field: "cioDisplayName",
@@ -1200,14 +1160,6 @@ export function AgGridTriageTable({
         hide: true,
         cellRenderer: DueDateCellRenderer,
         filter: "agDateColumnFilter",
-      },
-      {
-        headerName: "Past Due",
-        field: "pastDue",
-        hide: true,
-        cellRenderer: BooleanBadgeCellRenderer,
-        filter: "agSetColumnFilter",
-        filterParams: { values: FILTER_OPTIONS.pastDue },
       },
       {
         headerName: "Disposition",
@@ -1254,74 +1206,11 @@ export function AgGridTriageTable({
         filter: "agTextColumnFilter",
       },
       {
-        headerName: "Technical Executive",
-        field: "technicalExecutiveContactName",
-        hide: true,
-        filter: "agTextColumnFilter",
-      },
-      {
         headerName: "ESM Type",
         field: "esmType",
         hide: true,
         filter: "agSetColumnFilter",
         filterParams: { values: ["ESM - OS", "UNAUTH-DEVICE", "Application"] },
-      },
-      {
-        headerName: "Consequence Model",
-        field: "consequenceModel",
-        hide: true,
-        filter: "agSetColumnFilter",
-      },
-      {
-        headerName: "Verification Status",
-        field: "verificationStatus",
-        hide: true,
-        cellRenderer: VerificationStatusBadgeCellRenderer,
-        filter: "agSetColumnFilter",
-      },
-      {
-        headerName: "Scorecard ERP Details",
-        field: "scorecardErpStatusDetails",
-        hide: true,
-        filter: "agTextColumnFilter",
-      },
-      {
-        headerName: "Is CISA",
-        field: "isCisa",
-        hide: true,
-        cellRenderer: BooleanBadgeCellRenderer,
-        filter: "agSetColumnFilter",
-        filterParams: { values: ["Y", "N"] },
-      },
-      {
-        headerName: "Is DMZ",
-        field: "isDmz",
-        hide: true,
-        cellRenderer: BooleanBadgeCellRenderer,
-        filter: "agSetColumnFilter",
-        filterParams: { values: ["Y", "N"] },
-      },
-      {
-        headerName: "Is Public Internet",
-        field: "isPublicInternetAccessible",
-        hide: true,
-        cellRenderer: BooleanBadgeCellRenderer,
-        filter: "agSetColumnFilter",
-        filterParams: { values: ["Y", "N"] },
-      },
-      {
-        headerName: "Hosting Platform",
-        field: "hostingPlatform",
-        hide: true,
-        filter: "agSetColumnFilter",
-        filterParams: { values: ["BofA Cloud Standard N", "BofA Cloud Static N", "Nextgen BMP N"] },
-      },
-      {
-        headerName: "FQDN",
-        field: "fqdn",
-        hide: true,
-        filter: "agTextColumnFilter",
-        cellClass: "font-mono text-xs",
       },
       {
         headerName: "IP Addresses",
@@ -1331,41 +1220,11 @@ export function AgGridTriageTable({
         cellClass: "font-mono text-xs",
       },
       {
-        headerName: "Scheduled Fix Date",
-        field: "scheduledFixDate",
-        hide: true,
-        filter: "agDateColumnFilter",
-      },
-      {
-        headerName: "Resolved Date",
-        field: "resolvedDate",
-        hide: true,
-        filter: "agDateColumnFilter",
-      },
-      {
-        headerName: "Freshness / Version Date",
-        field: "freshnessDate",
-        hide: true,
-        filter: "agDateColumnFilter",
-      },
-      {
-        headerName: "ERP Exception ID",
-        field: "erpExceptionId",
-        hide: true,
-        filter: "agTextColumnFilter",
-      },
-      {
         headerName: "ERP Exception Status",
         field: "erpExceptionRequestStatus",
         hide: true,
         filter: "agSetColumnFilter",
         filterParams: { values: ["Approved", "Pending"] },
-      },
-      {
-        headerName: "Vulnerability Subcategory",
-        field: "vulnerabilitySubcategory",
-        hide: true,
-        filter: "agSetColumnFilter",
       },
       {
         headerName: "OS Name",
@@ -1652,10 +1511,6 @@ export function AgGridTriageTable({
     const updated = api.getSelectedRows().map((row: Vulnerability) => ({
       ...row,
       disposition: disposition as Disposition,
-      triageStatus:
-        row.triageStatus === "Awaiting Disposition"
-          ? "In Progress"
-          : row.triageStatus,
     }));
     api.applyTransaction({ update: updated });
   }, []);
@@ -1757,7 +1612,6 @@ export function AgGridTriageTable({
     workstream: "Workstream",
     source: "Source",
     operatingEnvironment: "Operating Env",
-    pastDue: "Past Due",
   };
 
   return (

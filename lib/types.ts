@@ -1,5 +1,9 @@
 // Vulnerability Triage Dashboard Types
 // AG Grid Enterprise v32.3.0 + AG Charts Enterprise v10.0.0
+//
+// The `Vulnerability` shape is the FE projection of the
+// `GetVulnerabilityCM` API row. Fields the API does not return have been
+// removed — don't reintroduce one without a backend contract for it.
 
 export type TriageStatus =
   | "Awaiting Disposition"
@@ -54,8 +58,9 @@ export type Source =
   | "Cloud Config Compliance"
   | "Nextgen BMP";
 
-// Authoritative remediation lever — every finding belongs to exactly one.
-// See docs/lever-scope-discovery.md for context on the four-value taxonomy.
+// Authoritative remediation lever — kept as a type but no longer a field on
+// Vulnerability (the API does not return it). The CIO/CIO-1 cascade API
+// update may bring it back.
 export type Lever =
   | "CTI/APS&E/EET-Managed Remediation"
   | "Assessment Underway"
@@ -109,138 +114,70 @@ export const DISPOSITIONS: { label: string; value: Disposition; group: "spec" | 
   { label: "Other (please provide detail)", value: "Other (please provide detail)", group: "spec" },
 ];
 
-export interface ActivityLogEntry {
-  id: string;
-  userId: string;
-  userName: string;
-  userInitials: string;
-  action: string;
-  field?: string;
-  oldValue?: string;
-  newValue?: string;
-  timestamp: string; // ISO string — deterministic for SSR
-}
-
+// FE projection of one VulnerabilityCm record. Every field below corresponds
+// to a key on the wire response (see `lib/api/responses.ts` ApiVulnerabilityRow);
+// the adapter in `lib/api/adapters.ts` performs the casing / type / format
+// normalization.
 export interface Vulnerability {
-  // Source data (read-only from Hadoop/Roger's DB)
-  obiid: string;
-  id: string;
+  // Identity & report metadata
+  id: string; // sourced from API `gisid`
+  reportDate: string;
   qualysId: number;
   cve: string;
   title: string;
+
+  // Categorization
   severityRisk: SeverityRisk;
   status: SourceStatus;
   workstream: Workstream;
   source: Source;
-  lever: Lever;
+  scorecardSource: string;
   operatingEnvironment: OperatingEnvironment;
+  esmType: string;
+  patchCategory: string;
+
+  // Host / asset
   hostName: string;
-  fqdn: string;
   ipAddresses: string;
   osName: string;
   deviceType: string;
-  hostingPlatform: string;
-  technology: string;
-  technologyVersion: string;
+
+  // Application
   applicationFullName: string;
   applicationId: string;
   applicationManagerContactName: string;
-  applicationManagerContactNetwork: string;
-  applicationSupportContactName: string;
-  applicationSupportContactNetwork: string;
-  technicalExecutiveContactName: string;
-  technicalExecutiveContactNetwork: string;
   cioDisplayName: string;
-  operationalCto: string;
-  runbookOwner: string;
   financialHierarchy: string;
-  patchCategory: string;
-  description: string;
+
+  // Descriptive
   technicalDescription: string;
   technicalDetail: string;
-  vulnerabilityFindings: string;
-  vulnerabilitySubcategory: string;
-  consequenceModel: string;
-  verificationStatus: string;
-  pastDue: "Y" | "N";
-  daysOpen: number;
+
+  // Dates
   dueDate: string;
-  scheduledFixDate: string;
-  resolvedDate: string;
-  reportDate: string;
-  freshnessDate: string;
-  firstConsequenceDate: string;
-  secondConsequenceDate: string;
-  thirdConsequenceDate: string;
-  erpScorecardStatus: string;
-  scorecardErpStatusDetails: string;
-  erpExceptionId: string;
-  erpExceptionRequestStatus: string;
-  erpExceptionExpirationDate: string;
-  erpExceptionRiskDecision: string;
-  erpExceptionBisoRequestStatus: string;
-  associatedErpExceptions: string;
-  erpScorecardPendingId: string;
-  erpScorecardPendingStatus: string;
-  erpScorecardPendingExpirationDate: string;
-  isDmz: "Y" | "N";
-  isPublicInternetAccessible: "Y" | "N";
-  isCisa: "Y" | "N";
-  isOnSite: string;
-  securityZone: string;
-  gisAssetCategory: string;
-  gisMetricAlignment: string;
-  gisExternalFlag: string;
-  gisThirdPartyScope: string;
-  port: string;
-  assessmentArea: string;
-  assessmentScope: string;
-  scorecardSource: string;
-  sigAlgorithm: string;
-  issuerName: string;
-  cloudAccountId: string;
-  resourceId: string;
-  resourceType: string;
-  policyName: string;
-  nonBauReason: string;
-  domain: string;
-  thirdPartyName: string;
-  remediation: string;
-  scorecardErpDays: string;
-  evm: string;
-  tppe: string;
-  acceptableUseId: string;
-  acceptableUseExpirationDate: string;
-  acceptableUseStatus: string;
-  decommissionRequestNumber: string;
-  decommissionRequestStatus: string;
-  esmType: string;
   dateObserved: string;
   dateLastSeen: string;
   hostLastSeen: string;
-  classificationDate: string;
-  // Triage state (written by this UI)
-  triageStatus: TriageStatus;
+
+  // GIS / ERP flags
+  gisExternalFlag: string;
+  erpScorecardStatus: string;
+  erpExceptionRequestStatus: string;
+  acceptableUseStatus: string;
+
+  // Triage state — written by this UI, round-trips via BulkUpdateVCMExtra
   disposition: Disposition;
-  /** Free-text detail shown when disposition is "Other (please provide detail)". */
-  dispositionDetail?: string;
   rcManagingTeam: string;
-  ctiRemediation: "Yes" | "No" | "";
   requestedPatchWindow: string;
   expectedRemediationDate: string;
   crqNumber: string;
-  remediationPendingClearScan: "Yes" | "No" | "";
-  healthCheckTime: string;
-  healthCheckComplete: "Yes" | "No" | "";
   identifiedBlockers: Blocker[];
-  otherBlockerDetail: string;
-  falsePositiveReason: string;
-  deferralJustification: string;
-  reEvaluateBy: string;
-  vulnOwner: string;
+
+  // Audit trail (from createdUserId/createdDateTime/updatedUserId/updatedDateTime)
+  createdBy: string;
+  createdAt: string;
   lastSavedBy: string;
   lastSavedAt: string;
-  activityLog: ActivityLogEntry[];
 }
 
 export interface CioTeam {

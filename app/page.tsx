@@ -32,9 +32,7 @@ import { AgGridTriageTable } from "@/components/executive/ag-grid-table";
 import { SourceBarChart, DaysOpenChart, RemediationTrendChart, SlaComplianceChart } from "@/components/dashboard/charts";
 import { BlockersStrip } from "@/components/dashboard/blockers-strip";
 import { NoRemediationDateCard } from "@/components/executive/no-remediation-date-card";
-import { AwaitingScanCard } from "@/components/executive/awaiting-scan-card";
 import { RiskAcceptedCard } from "@/components/executive/risk-accepted-card";
-import { ActionRequiredPanel } from "@/components/executive/action-required-panel";
 import { EolExposures } from "@/components/executive/eol-exposures";
 import { TopUnresolvedVulnerabilities } from "@/components/executive/top-unresolved-vulnerabilities";
 import { UserGuideSheet } from "@/components/executive/user-guide-sheet";
@@ -1053,10 +1051,9 @@ const DIMENSION_TITLES: Record<Dimension, string> = {
   owner: "Findings by Owner",
 };
 
-const TRIAGE_STATUS_TO_PRESET: Record<TriageStatus, FilterPresetId> = {
+const TRIAGE_STATUS_TO_PRESET: Partial<Record<TriageStatus, FilterPresetId>> = {
   "Awaiting Disposition": "awaitingDisposition",
   "In Progress": "inProgress",
-  "Pending Clear Scan": "pendingClearScan",
   Resolved: "resolved",
 };
 
@@ -1112,17 +1109,6 @@ function DashboardPage({ stats, onNavigate, vulnerabilities, onApplyFilterPreset
       trendBad: false,
       animDelay: 80,
       triageStatus: "In Progress",
-    },
-    {
-      label: "Pending Clear Scan",
-      count: stats.pendingClear,
-      Icon: ScanSearch,
-      accentColor: "#3B82F6",
-      trend: 1,
-      trendLabel: "1 more than last week",
-      trendBad: true,
-      animDelay: 160,
-      triageStatus: "Pending Clear Scan",
     },
     {
       label: "Resolved (last 30 days)",
@@ -1194,26 +1180,9 @@ function DashboardPage({ stats, onNavigate, vulnerabilities, onApplyFilterPreset
           count={stats.noRemediationDate}
           onClick={() => onApplyFilterPreset("noRemediationDate")}
         />
-        <AwaitingScanCard
-          count={stats.awaitingScan}
-          onClick={() => onApplyFilterPreset("awaitingScan")}
-        />
         <RiskAcceptedCard
           count={stats.riskAccepted}
           onClick={() => onApplyFilterPreset("riskAccepted")}
-        />
-      </section>
-
-      {/* Action Required — full-width, elevated (amber tint + border) so it
-          reads as the most urgent thing on the page. Stripped down to only
-          threshold-based items; status counts moved to secondary cards above. */}
-      <section className="mb-3" aria-label="Action required">
-        <ActionRequiredPanel
-          settings={dashboardSettings}
-          counts={{
-            validationPendingOverThreshold: stats.validationPendingOverThreshold,
-          }}
-          onSelectPreset={onApplyFilterPreset}
         />
       </section>
 

@@ -1,19 +1,22 @@
 // External-filter presets driven by dashboard cards / Action Required rows.
-// These are applied via AG Grid's `isExternalFilterPresent` + `doesExternalFilterPass`
+// Applied via AG Grid's `isExternalFilterPresent` + `doesExternalFilterPass`
 // hooks rather than the column filter model, so they don't conflict with the
 // user's own column filters or the Saved Views state.
+//
+// Several presets that relied on FE-only fields (triageStatus, daysOpen,
+// remediationPendingClearScan) were removed when the FE type was aligned
+// with the GetVulnerabilityCM API response. The cards consuming the removed
+// IDs (Validation Pending, Awaiting Scan, Pending Clear Scan) are pruned in
+// the dashboard layer.
 
 import type { Vulnerability } from "./types";
 import type { DashboardSettings } from "./dashboard-settings";
 
 export type FilterPresetId =
   | "noRemediationDate"
-  | "validationPendingOverThreshold"
-  | "awaitingScan"
   | "riskAccepted"
   | "awaitingDisposition"
   | "inProgress"
-  | "pendingClearScan"
   | "resolved";
 
 export interface FilterPresetMeta {
@@ -25,14 +28,6 @@ export const FILTER_PRESETS: Record<FilterPresetId, FilterPresetMeta> = {
   noRemediationDate: {
     id: "noRemediationDate",
     label: "No remediation date",
-  },
-  validationPendingOverThreshold: {
-    id: "validationPendingOverThreshold",
-    label: "Validation pending over threshold",
-  },
-  awaitingScan: {
-    id: "awaitingScan",
-    label: "Awaiting scan",
   },
   riskAccepted: {
     id: "riskAccepted",
@@ -46,10 +41,6 @@ export const FILTER_PRESETS: Record<FilterPresetId, FilterPresetMeta> = {
     id: "inProgress",
     label: "In Progress",
   },
-  pendingClearScan: {
-    id: "pendingClearScan",
-    label: "Pending Clear Scan",
-  },
   resolved: {
     id: "resolved",
     label: "Resolved",
@@ -59,37 +50,23 @@ export const FILTER_PRESETS: Record<FilterPresetId, FilterPresetMeta> = {
 export function matchesPreset(
   v: Vulnerability,
   preset: FilterPresetId,
-  settings: DashboardSettings,
+  _settings: DashboardSettings,
 ): boolean {
   switch (preset) {
     case "noRemediationDate":
-      // The "No Remediation Date" dashboard card scopes to the visible
-      // Due Date column — the SLA deadline a CIO scans for. Using the
-      // user-set expectedRemediationDate previously matched almost every
-      // row (it's empty whenever a CRQ hasn't been raised yet) and made
-      // the filter feel like a no-op.
+      // SLA deadline missing → the "No Remediation Date" dashboard card.
       return !v.dueDate || v.dueDate.trim() === "";
-    case "validationPendingOverThreshold":
-      // Spec says "Validation Pending"; the data model uses "Pending Clear Scan".
-      return (
-        v.triageStatus === "Pending Clear Scan" &&
-        v.daysOpen > settings.validationPendingThresholdDays
-      );
-    case "awaitingScan":
-      // Spec: Remediation Complete = true (remediationPendingClearScan === "Yes")
-      // AND the source-system status is still Open — i.e., the clear scan has
-      // not yet confirmed closure.
-      return v.remediationPendingClearScan === "Yes" && v.status === "Open";
     case "riskAccepted":
       return v.disposition === "Accept Risk";
     case "awaitingDisposition":
-      return v.triageStatus === "Awaiting Disposition";
+      // Derived: no disposition has been chosen yet (empty string is falsy).
+      return !v.disposition;
     case "inProgress":
-      return v.triageStatus === "In Progress";
-    case "pendingClearScan":
-      return v.triageStatus === "Pending Clear Scan";
+      // Derived: disposition chosen, source-system status still Open.
+      return !!v.disposition && v.status === "Open";
     case "resolved":
-      return v.triageStatus === "Resolved";
+      // Derived: source-system has closed the finding.
+      return v.status === "Closed";
   }
 }
 
