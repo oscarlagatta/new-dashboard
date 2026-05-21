@@ -36,7 +36,7 @@ import { RiskAcceptedCard } from "@/components/executive/risk-accepted-card";
 import { EolExposures } from "@/components/executive/eol-exposures";
 import { TopUnresolvedVulnerabilities } from "@/components/executive/top-unresolved-vulnerabilities";
 import { UserGuideSheet } from "@/components/executive/user-guide-sheet";
-import { mockVulnerabilities } from "@/lib/mock-data";
+import { useVulnerabilities, useBulkUpdate } from "@/lib/api/hooks";
 import type { Vulnerability, TriageStatus } from "@/lib/types";
 import { formatCount } from "@/lib/utils";
 import { useViewport } from "@/lib/use-viewport";
@@ -1622,6 +1622,12 @@ export default function App() {
 
   const stats = DASHBOARD_STATS;
 
+  // Phase 3: real data from the heyAPI client (same-origin → Next.js mock
+  // routes during dev; real backend when NEXT_PUBLIC_API_BASE_URL is set).
+  const { data: vulnsData } = useVulnerabilities({ filters: {}, pageSize: 5000 });
+  const vulnerabilities = vulnsData?.rows ?? [];
+  const bulkUpdate = useBulkUpdate();
+
   const onNavigate = useCallback((page: Page) => setCurrentPage(page), []);
 
   const onApplyFilterPreset = useCallback((preset: FilterPresetId) => {
@@ -1636,7 +1642,24 @@ export default function App() {
     setSheetOpen(true);
   }, []);
 
-  const onSave = useCallback((v: Vulnerability) => setSelectedVuln(v), []);
+  const onSave = useCallback(
+    (v: Vulnerability) => {
+      setSelectedVuln(v);
+      // Persist via BulkUpdateVCMExtra (single-item payload). The mutation
+      // invalidates the vulnerabilities query on success so the grid refetches.
+      bulkUpdate.mutate({
+        rows: [{ id: v.id }],
+        patch: {
+          disposition: v.disposition,
+          requestedPatchWindow: v.requestedPatchWindow,
+          expectedRemediationDate: v.expectedRemediationDate,
+          crqNumber: v.crqNumber,
+          identifiedBlockers: v.identifiedBlockers,
+        },
+      });
+    },
+    [bulkUpdate]
+  );
 
   return (
     <>
@@ -1689,12 +1712,12 @@ export default function App() {
             <DashboardPage
               stats={stats}
               onNavigate={onNavigate}
-              vulnerabilities={mockVulnerabilities}
+              vulnerabilities={vulnerabilities}
               onApplyFilterPreset={onApplyFilterPreset}
             />
           ) : (
             <VulnerabilitiesPage
-              vulnerabilities={mockVulnerabilities}
+              vulnerabilities={vulnerabilities}
               selectedVuln={selectedVuln}
               sheetOpen={sheetOpen}
               onRowSelected={onRowSelected}

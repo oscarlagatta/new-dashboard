@@ -87,6 +87,7 @@ import {
   DEFAULT_DASHBOARD_SETTINGS,
   type DashboardSettings,
 } from "@/lib/dashboard-settings";
+import { useBulkUpdate } from "@/lib/api/hooks";
 
 // For production: replace with rowModelType='serverSide' and provide a
 // serverSideDatasource that calls the .NET API endpoint.
@@ -462,53 +463,11 @@ function BulkActionBar({
 }
 
 // ── Bulk Update Toolbar ────────────────────────────────────────────────────────
-
-// Wire shape for BulkUpdateVCMExtra. Every field except gisid is optional —
-// only the fields the user staged are sent so the backend doesn't overwrite
-// untouched values.
-interface BulkUpdateItem {
-  gisid: string;
-  disposition?: string;
-  requestedPatchWindow?: string;
-  expectedRemediationDate?: string; // .NET datetime, e.g. "2026-07-15T00:00:00"
-  crq?: string;
-  identifiedBlockers?: string; // delimiter TBD with backend
-}
-
-interface BulkUpdatePayload {
-  items: BulkUpdateItem[];
-  updatedUserId?: number;
-}
-
-// Maps a FE patch (Partial<Vulnerability>) + gisid to one wire item.
-// Handles the FE↔API name/type/format gaps: crqNumber→crq, Blocker[]→string,
-// YYYY-MM-DD→ISO datetime.
-function patchToApiItem(gisid: string, patch: Partial<Vulnerability>): BulkUpdateItem {
-  const item: BulkUpdateItem = { gisid };
-  if (patch.disposition !== undefined) item.disposition = patch.disposition;
-  if (patch.requestedPatchWindow !== undefined) {
-    item.requestedPatchWindow = patch.requestedPatchWindow;
-  }
-  if (patch.expectedRemediationDate !== undefined) {
-    item.expectedRemediationDate = patch.expectedRemediationDate
-      ? `${patch.expectedRemediationDate}T00:00:00`
-      : "";
-  }
-  if (patch.crqNumber !== undefined) item.crq = patch.crqNumber;
-  if (patch.identifiedBlockers !== undefined) {
-    item.identifiedBlockers = patch.identifiedBlockers.join("; ");
-  }
-  return item;
-}
-
-/**
- * Shared bulk-update handler — STUB. Wire this to the real BulkUpdateVCMExtra
- * endpoint once integrated. The 200 response body is empty; treat success as
- * status 200 with no JSON parse.
- */
-function bulkUpdateApi(payload: BulkUpdatePayload): void {
-  console.info(`[bulk-update stub] payload:`, payload);
-}
+//
+// Wire shape for BulkUpdateVCMExtra lives in `lib/api/responses.ts` and the
+// FE→API mapping in `lib/api/adapters.ts`. The mutation hook (auto-invalidates
+// the vulnerabilities query on success) is consumed inside the component via
+// `useBulkUpdate()`.
 
 // Shared styling for the native <select>/<textarea> in the disposition popover.
 const BULK_FIELD_CLASS =
@@ -927,6 +886,9 @@ export function AgGridTriageTable({
   onClearLeverScope,
 }: Props) {
   const gridRef = useRef<AgGridReact>(null);
+  // Bulk-update mutation — invalidates the vulnerabilities query on success so
+  // the grid refetches with the freshly-persisted values.
+  const bulkUpdate = useBulkUpdate();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [gridApi, setGridApi] = useState<any>(null);
   const [quickFilter, setQuickFilter] = useState("");
@@ -1520,25 +1482,26 @@ export function AgGridTriageTable({
 
   /**
    * Shared bulk-update handler — applies a field patch to every selected row
-   * and routes through the (stubbed) bulk-update API.
+   * via BulkUpdateVCMExtra. Optimistically updates the grid immediately; the
+   * mutation's onSuccess invalidates the vulnerabilities query so the next
+   * refetch reflects server state. FE `id` is the API `gisid`.
+   *
+   * TODO(nx-monorepo): once integrated, pass `updatedUserId` from
+   * `useAuth().user.id` through the mutation (currently omitted).
    */
-  const applyBulkPatch = useCallback((patch: Partial<Vulnerability>) => {
-    const api = gridRef.current?.api;
-    if (!api) return;
-    const selected = api.getSelectedRows() as Vulnerability[];
-    if (selected.length === 0) return;
-    // FE `id` is the API's `gisid` (mapped from SQL GISID — see
-    // docs/vuln-data-collection-plan.md). Rename end-to-end when the
-    // response-mapper layer lands.
-    const items = selected.map((row) => patchToApiItem(row.id, patch));
-    // TODO(nx-monorepo): set `updatedUserId` from AuthContext
-    // (`useAuth().user.id`) when this component is integrated into the
-    // monorepo. Standalone dev omits the field.
-    bulkUpdateApi({ items });
-    api.applyTransaction({
-      update: selected.map((row) => ({ ...row, ...patch })),
-    });
-  }, []);
+  const applyBulkPatch = useCallback(
+    (patch: Partial<Vulnerability>) => {
+      const api = gridRef.current?.api;
+      if (!api) return;
+      const selected = api.getSelectedRows() as Vulnerability[];
+      if (selected.length === 0) return;
+      bulkUpdate.mutate({ rows: selected, patch });
+      api.applyTransaction({
+        update: selected.map((row) => ({ ...row, ...patch })),
+      });
+    },
+    [bulkUpdate]
+  );
 
   const getContextMenuItems = useCallback(
     (params: GetContextMenuItemsParams): (string | MenuItemDef)[] => {
